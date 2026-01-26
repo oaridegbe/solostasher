@@ -1,17 +1,38 @@
-"use client";
-import { signIn } from "next-auth/react";
+"use client"; // must be a client component for useSession
 
-export default function Home() {
+import { SessionProvider } from "next-auth/react";
+import { useSession, signIn, signOut } from "next-auth/react";
+
+/* ---------- mini header that reacts to session ---------- */
+function AuthBar() {
+  const { data: session, status } = useSession();
+
+  if (status === "loading") return <p>Loading…</p>;
+
+  if (session)
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+        <span>Signed in as <strong>{session.user?.email}</strong></span>
+        <button onClick={() => signOut()}>Sign out</button>
+      </div>
+    );
+
   return (
-    <main className="p-6">
-      <h1 className="text-2xl font-bold mb-4">SoloStasher</h1>
-      <a
-        href="/api/auth/signin/google"
-        className="inline-block px-5 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-      >
-        Sign in with Google
-      </a>
-    </main>
+    <button onClick={() => signIn("google")}>Sign in with Google</button>
   );
 }
+
+/* ---------- root page ---------- */
+export default function Home() {
+  return (
+    <SessionProvider>
+      <main style={{ padding: "2rem" }}>
+        <AuthBar />
+        <h1>Welcome to Solostasher</h1>
+        <p>Your kanban board appears here…</p>
+      </main>
+    </SessionProvider>
+  );
+}
+
 
