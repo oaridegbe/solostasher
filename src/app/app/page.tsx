@@ -23,16 +23,18 @@ export default function Dashboard() {
     <main className="p-6">
       <h1 className="text-2xl font-bold mb-4">SoloStasher Board</h1>
 
-      {/* NEW FORM */}
-      <div className="mb-4">
-        <input id="title" placeholder="Deal title" className="px-3 py-2 border rounded mr-2" />
-        <input id="email" placeholder="Client email" className="px-3 py-2 border rounded mr-2" />
+      {/* NEW DEAL FORM with color picker */}
+      <div className="mb-4 flex items-center gap-2">
+        <input id="title" placeholder="Deal title" className="px-3 py-2 border rounded" />
+        <input id="email" placeholder="Client email" className="px-3 py-2 border rounded" />
+        <input id="color" type="color" className="w-10 h-10 border rounded cursor-pointer" defaultValue="#3b82f6" />
         <button
           onClick={async () => {
             const title = (document.getElementById("title") as HTMLInputElement).value;
             const email = (document.getElementById("email") as HTMLInputElement).value;
+            const color = (document.getElementById("color") as HTMLInputElement).value;
             if (!title) return;
-            await fetch("/api/cards", { method: "POST", body: JSON.stringify({ title, email }) });
+            await fetch("/api/cards", { method: "POST", body: JSON.stringify({ title, email, color }) });
             location.reload();
           }}
           className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
@@ -41,7 +43,7 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* KANBAN GRID */}
+      {/* KANBAN GRID with color-coded cards */}
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex gap-4">
           {columns.map(col => (
@@ -52,7 +54,13 @@ export default function Dashboard() {
                   {cards.filter(c => c.status === col).map((c, idx) => (
                     <Draggable key={c.id} draggableId={c.id} index={idx}>
                       {(p) => (
-                        <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps} className="bg-white p-3 mb-2 rounded shadow">
+                        <div
+                          ref={p.innerRef}
+                          {...p.draggableProps}
+                          {...p.dragHandleProps}
+                          className="bg-white p-3 mb-2 rounded shadow cursor-move"
+                          style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
+                        >
                           <p className="font-semibold">{c.title}</p>
                           <p className="text-sm text-gray-500">{c.client_email}</p>
                         </div>
