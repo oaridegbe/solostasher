@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { SessionProvider } from "next-auth/react";
 import AuthBar from "./AuthBar";
-import { authOptions } from "./api/auth/[...nextauth]/route";
+import { authOptions } from "./api/auth/[...nextauth]/authOptions";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);

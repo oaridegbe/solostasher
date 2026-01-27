@@ -1,4 +1,3 @@
-// AuthBar component for NextAuth session
 "use client";
 
 import { useSession, signIn, signOut } from "next-auth/react";
@@ -11,10 +10,11 @@ export default function AuthBar() {
   if (session)
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-        <span>Signed in as <strong>{session.user?.email}</strong></span>
+        <span>Signed in as <strong>{session.user?.email || session.user?.name || "Unknown"}</strong></span>
         <button onClick={() => signOut()}>Sign out</button>
       </div>
     );
 
   return <button onClick={() => signIn("google")}>Sign in with Google</button>;
 }
+
