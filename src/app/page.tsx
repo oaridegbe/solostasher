@@ -1,21 +1,20 @@
-import { getServerSession } from "next-auth/next";
+"use client";
+
 import { SessionProvider } from "next-auth/react";
 import AuthBar from "./AuthBar";
-import { authOptions } from "./api/auth/[...nextauth]/authOptions";
 
-export default async function Home() {
-  const session = await getServerSession(authOptions);
-
+export default function Home() {
   return (
-    <SessionProvider session={session}>
+    <SessionProvider>
       <main style={{ padding: "2rem" }}>
         <AuthBar />
-        <h1>Welcome to Solostasher</h1>
+        <h1>Welcome to SoloStasher</h1>
         <p>Your kanban board appears here…</p>
       </main>
     </SessionProvider>
   );
 }
+
 
 
 
