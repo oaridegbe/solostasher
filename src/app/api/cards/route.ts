@@ -14,9 +14,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const id = crypto.randomUUID();
   await db.execute(
-    "INSERT INTO cards (id, user_id, title, client_email, status, color) VALUES (?, ?, ?, ?, ?, ?)",
-    [String(id), String((session.user as any).id), String(body.title), String(body.email), "inquiry", String(body.color)]
-  );
+  "INSERT INTO cards (id, user_id, title, client_email, status) VALUES (?, ?, ?, ?, ?)",
+  [String(id), String((session.user as any).id), String(body.title), String(body.email), "inquiry"]
+);
   return NextResponse.json({ ok: true });
 }
 
