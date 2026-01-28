@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { DragDropContext, Droppable, Draggable, PointerSensor, MouseSensor } from "@hello-pangea/dnd";
 
 const columns = ["inquiry", "quoted", "won", "followup"];
 
@@ -15,28 +15,28 @@ export default function Dashboard() {
   }, []);
 
   async function onDragEnd(result: any) {
-  if (!result.destination) return;
+    if (!result.destination) return;
 
-  const newStatus = result.destination.droppableId;
-  const cardId = result.draggableId;
+    const newStatus = result.destination.droppableId;
+    const cardId = result.draggableId;
 
-  // 1. Instant UI update
-  setCards(prev =>
-    prev.map(c => (c.id === cardId ? { ...c, status: newStatus } : c))
-  );
-
-  // 2. Background sync (no await = no lag)
-  fetch("/api/move", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cardId, newStatus })
-  }).catch(() => {
-    // Optional: rollback on failure
+    // Optimistic UI update first
     setCards(prev =>
-      prev.map(c => (c.id === cardId ? { ...c, status: result.source.droppableId } : c))
+      prev.map(c => (c.id === cardId ? { ...c, status: newStatus } : c))
     );
-  });
-}
+
+    // Background sync
+    fetch("/api/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId, newStatus })
+    }).catch(() => {
+      // Optional rollback on failure
+      setCards(prev =>
+        prev.map(c => (c.id === cardId ? { ...c, status: result.source.droppableId } : c))
+      );
+    });
+  }
 
   return (
     <main className="p-6">
@@ -60,7 +60,7 @@ export default function Dashboard() {
               console.error("Create failed", await res.text());
               return;
             }
-            location.reload(); // simple refresh for now
+            location.reload();
           }}
           className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
         >
@@ -68,8 +68,17 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* KANBAN GRID */}
-      <DragDropContext onDragEnd={onDragEnd}>
+      {/* KANBAN GRID with zero-lag drag */}
+      <DragDropContext
+        onDragEnd={onDragEnd}
+        enableDefaultSensors={false}
+        sensors={[
+          {
+            sensor: window.PointerEvent ? PointerSensor : MouseSensor,
+            options: { activationConstraint: { distance: 0 } }
+          }
+        ]}
+      >
         <div className="flex gap-4">
           {columns.map(col => (
             <Droppable droppableId={col} key={col}>
@@ -84,18 +93,18 @@ export default function Dashboard() {
                     .filter(c => c.status === col)
                     .map((c, idx) => (
                       <Draggable key={c.id} draggableId={c.id} index={idx}>
-  {(p) => (
-    <div
-      ref={p.innerRef}
-      {...p.draggableProps}
-      className="bg-white p-3 mb-2 rounded shadow"
-      style={{ borderLeft: "5px solid #3b82f6" }}
-    >
-      <p className="font-semibold cursor-move" {...p.dragHandleProps}>{c.title}</p>
-      <p className="text-sm text-gray-500">{c.client_email}</p>
-    </div>
-  )}
-</Draggable>
+                        {(p) => (
+                          <div
+                            ref={p.innerRef}
+                            {...p.draggableProps}
+                            className="bg-white p-3 mb-2 rounded shadow"
+                            style={{ borderLeft: "5px solid #3b82f6" }}
+                          >
+                            <p className="font-semibold cursor-move" {...p.dragHandleProps}>{c.title}</p>
+                            <p className="text-sm text-gray-500">{c.client_email}</p>
+                          </div>
+                        )}
+                      </Draggable>
                     ))}
                   {provided.placeholder}
                 </div>
