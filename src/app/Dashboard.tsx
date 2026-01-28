@@ -1,8 +1,18 @@
 "use client";
+import React from "react";
 import { useEffect, useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 const columns = ["inquiry", "quoted", "won", "followup"];
+
+// -------------  drag-preview blocker  -------------
+function DraggablePreviewBlocker() {
+  const hidden = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (hidden.current) hidden.current.style.display = "none";
+  }, []);
+  return <div ref={hidden} style={{ position: "fixed", top: -9999, left: -9999 }} />;
+}
 
 export default function Dashboard() {
   const [cards, setCards] = useState<any[]>([]);
@@ -67,7 +77,7 @@ export default function Dashboard() {
                     .filter(c => c.status === col)
                     .map((c, idx) => (
                       <Draggable key={c.id} draggableId={c.id} index={idx}>
-                        {(p) => (
+                        {(p, snapshot) => (
                           <div
                             ref={p.innerRef}
                             {...p.draggableProps}
@@ -77,6 +87,7 @@ export default function Dashboard() {
                           >
                             <p className="font-semibold">{c.title}</p>
                             <p className="text-sm text-gray-500">{c.client_email}</p>
+                            {snapshot.isDragging && <DraggablePreviewBlocker />}
                           </div>
                         )}
                       </Draggable>
