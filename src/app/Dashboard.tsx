@@ -25,21 +25,27 @@ export default function Dashboard() {
   }, []);
 
   async function onDragEnd(result: any) {
-    if (!result.destination) return;
-    const newStatus = result.destination.droppableId;
-    const cardId = result.draggableId;
+  if (!result.destination) return;
 
-    // Optimistic UI
-    setCards(prev =>
-      prev.map(c => (c.id === cardId ? { ...c, status: newStatus } : c))
-    );
+  const newStatus = result.destination.droppableId;
+  const cardId = result.draggableId;
 
-    fetch("/api/move", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, newStatus })
-    });
-  }
+  // 1. INSTANT UI move (zero latency)
+  setCards(prev =>
+    prev.map(c =>
+      c.id === cardId
+        ? { ...c, status: newStatus }
+        : c
+    )
+  );
+
+  // 2. Fire-and-forget background save (no await = no lag)
+  fetch("/api/move", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cardId, newStatus })
+  }).catch(err => console.error("Move failed", err));
+}
 
   return (
     <main className="p-6">
