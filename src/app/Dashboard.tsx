@@ -15,28 +15,28 @@ export default function Dashboard() {
   }, []);
 
   async function onDragEnd(result: any) {
-    if (!result.destination) return;
+  if (!result.destination) return;
 
-    const newStatus = result.destination.droppableId;
-    const cardId = result.draggableId;
+  const newStatus = result.destination.droppableId;
+  const cardId = result.draggableId;
 
-    // Optimistic UI update first
+  // 1. Instant UI update
+  setCards(prev =>
+    prev.map(c => (c.id === cardId ? { ...c, status: newStatus } : c))
+  );
+
+  // 2. Background sync (no await = no lag)
+  fetch("/api/move", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cardId, newStatus })
+  }).catch(() => {
+    // Optional: rollback on failure
     setCards(prev =>
-      prev.map(c => (c.id === cardId ? { ...c, status: newStatus } : c))
+      prev.map(c => (c.id === cardId ? { ...c, status: result.source.droppableId } : c))
     );
-
-    // Fire-and-forget save to server
-    fetch("/api/move", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, newStatus })
-    }).catch(() => {
-      // Optional rollback on failure
-      setCards(prev =>
-        prev.map(c => (c.id === cardId ? { ...c, status: result.source.droppableId } : c))
-      );
-    });
-  }
+  });
+}
 
   return (
     <main className="p-6">
