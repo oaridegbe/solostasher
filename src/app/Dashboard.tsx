@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { DragDropContext, Droppable, Draggable, PointerSensor, MouseSensor } from "@hello-pangea/dnd";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 const columns = ["inquiry", "quoted", "won", "followup"];
 
@@ -16,7 +16,6 @@ export default function Dashboard() {
 
   async function onDragEnd(result: any) {
     if (!result.destination) return;
-
     const newStatus = result.destination.droppableId;
     const cardId = result.draggableId;
 
@@ -60,16 +59,7 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <DragDropContext
-        onDragEnd={onDragEnd}
-        enableDefaultSensors={false}
-        sensors={[
-          {
-            sensor: window.PointerEvent ? PointerSensor : MouseSensor,
-            options: { activationConstraint: { distance: 0 } }
-          }
-        ]}
-      >
+      <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex gap-4">
           {columns.map(col => (
             <Droppable droppableId={col} key={col}>
