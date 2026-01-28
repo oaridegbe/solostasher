@@ -76,7 +76,7 @@ export default function Dashboard() {
                             {...p.draggableProps}
                             {...p.dragHandleProps}
                             className="bg-white p-3 mb-2 rounded shadow cursor-move"
-                            style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
+                            style={{ borderLeft: '5px solid #3b82f6' }} // default blue until we add the column
                           >
                             <p className="font-semibold">{c.title}</p>
                             <p className="text-sm text-gray-500">{c.client_email}</p>
