@@ -44,7 +44,7 @@ export default function Dashboard() {
             if (!title) return;
             await fetch("/api/cards", {
               method: "POST",
-              body: JSON.stringify({ title, email, color }),
+              body: JSON.stringify({ title, email }),
             });
             location.reload();
           }}
