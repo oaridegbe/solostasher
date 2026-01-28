@@ -1,18 +1,8 @@
 "use client";
-import React from "react";
 import { useEffect, useState } from "react";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { DragDropContext, Droppable, Draggable, PointerSensor, MouseSensor } from "@hello-pangea/dnd";
 
 const columns = ["inquiry", "quoted", "won", "followup"];
-
-// -------------  drag-preview blocker  -------------
-function DraggablePreviewBlocker() {
-  const hidden = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    if (hidden.current) hidden.current.style.display = "none";
-  }, []);
-  return <div ref={hidden} style={{ position: "fixed", top: -9999, left: -9999 }} />;
-}
 
 export default function Dashboard() {
   const [cards, setCards] = useState<any[]>([]);
@@ -25,27 +15,25 @@ export default function Dashboard() {
   }, []);
 
   async function onDragEnd(result: any) {
-  if (!result.destination) return;
+    if (!result.destination) return;
 
-  const newStatus = result.destination.droppableId;
-  const cardId = result.draggableId;
+    const newStatus = result.destination.droppableId;
+    const cardId = result.draggableId;
 
-  // 1. INSTANT UI move (zero latency)
-  setCards(prev =>
-    prev.map(c =>
-      c.id === cardId
-        ? { ...c, status: newStatus }
-        : c
-    )
-  );
+    // INSTANT UI move (zero latency)
+    setCards(prev =>
+      prev.map(c =>
+        c.id === cardId ? { ...c, status: newStatus } : c
+      )
+    );
 
-  // 2. Fire-and-forget background save (no await = no lag)
-  fetch("/api/move", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cardId, newStatus })
-  }).catch(err => console.error("Move failed", err));
-}
+    // Fire-and-forget background save
+    fetch("/api/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId, newStatus })
+    }).catch(err => console.error("Move failed", err));
+  }
 
   return (
     <main className="p-6">
@@ -72,7 +60,16 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <DragDropContext onDragEnd={onDragEnd}>
+      <DragDropContext
+        onDragEnd={onDragEnd}
+        enableDefaultSensors={false}
+        sensors={[
+          {
+            sensor: window.PointerEvent ? PointerSensor : MouseSensor,
+            options: { activationConstraint: { distance: 0 } }
+          }
+        ]}
+      >
         <div className="flex gap-4">
           {columns.map(col => (
             <Droppable droppableId={col} key={col}>
@@ -83,7 +80,7 @@ export default function Dashboard() {
                     .filter(c => c.status === col)
                     .map((c, idx) => (
                       <Draggable key={c.id} draggableId={c.id} index={idx}>
-                        {(p, snapshot) => (
+                        {(p) => (
                           <div
                             ref={p.innerRef}
                             {...p.draggableProps}
@@ -93,7 +90,6 @@ export default function Dashboard() {
                           >
                             <p className="font-semibold">{c.title}</p>
                             <p className="text-sm text-gray-500">{c.client_email}</p>
-                            {snapshot.isDragging && <DraggablePreviewBlocker />}
                           </div>
                         )}
                       </Draggable>
