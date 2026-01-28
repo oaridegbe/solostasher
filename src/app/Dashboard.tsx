@@ -84,19 +84,18 @@ export default function Dashboard() {
                     .filter(c => c.status === col)
                     .map((c, idx) => (
                       <Draggable key={c.id} draggableId={c.id} index={idx}>
-                        {(p) => (
-                          <div
-                            ref={p.innerRef}
-                            {...p.draggableProps}
-                            {...p.dragHandleProps}
-                            className="bg-white p-3 mb-2 rounded shadow cursor-move"
-                            style={{ borderLeft: "5px solid #3b82f6" }}
-                          >
-                            <p className="font-semibold">{c.title}</p>
-                            <p className="text-sm text-gray-500">{c.client_email}</p>
-                          </div>
-                        )}
-                      </Draggable>
+  {(p) => (
+    <div
+      ref={p.innerRef}
+      {...p.draggableProps}
+      className="bg-white p-3 mb-2 rounded shadow"
+      style={{ borderLeft: "5px solid #3b82f6" }}
+    >
+      <p className="font-semibold cursor-move" {...p.dragHandleProps}>{c.title}</p>
+      <p className="text-sm text-gray-500">{c.client_email}</p>
+    </div>
+  )}
+</Draggable>
                     ))}
                   {provided.placeholder}
                 </div>
