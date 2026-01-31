@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 
 const columns = ["inquiry", "quoted", "won", "followup"];
-const allTags = ["Hot", "Referral", "Upsell"];
+const allTags = ["Hot", "Recurring", "Upsell"];
 
 export default function Dashboard() {
   const [cards, setCards] = useState<any[]>([]);
