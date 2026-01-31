@@ -67,7 +67,20 @@ export default function Dashboard() {
     }).catch(err => console.error("Tags update failed", err));
   }
 
-  // -----  new deal  (NO free-form tags input) -----
+  // -----  change due date  -----
+  async function changeDueDate(cardId: string, newDate: string) {
+    setCards(prev =>
+      prev.map(c => (c.id === cardId ? { ...c, due_date: newDate } : c))
+    );
+
+    fetch("/api/due", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId, due_date: newDate })
+    }).catch(err => console.error("Due-date update failed", err));
+  }
+
+  // -----  new deal  (no free-form tags input) -----
   async function createDeal() {
     const title = (document.getElementById("title") as HTMLInputElement).value;
     const email = (document.getElementById("email") as HTMLInputElement).value;
@@ -76,7 +89,7 @@ export default function Dashboard() {
     await fetch("/api/cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, email, color, tags: "" }) // no tags from form
+      body: JSON.stringify({ title, email, color, tags: "", due_date: "" }) // no tags, no due date from form
     });
     location.reload();
   }
@@ -85,6 +98,21 @@ export default function Dashboard() {
   const visibleCards = selectedTags.length
     ? cards.filter(c => selectedTags.some(t => (c.tags || "").split(",").includes(t)))
     : cards;
+
+  // -----  due-date badge  -----
+  function DueBadge({ date }: { date?: string }) {
+    if (!date) return null;
+    const today = new Date();
+    const due = new Date(date);
+    const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff < 0) {
+      return <span className="ml-2 px-2 py-0.5 text-xs rounded bg-red-500 text-white">Overdue</span>;
+    }
+    if (diff === 0) {
+      return <span className="ml-2 px-2 py-0.5 text-xs rounded bg-orange-500 text-white">Today</span>;
+    }
+    return <span className="ml-2 px-2 py-0.5 text-xs rounded bg-gray-200 text-gray-800">{diff}d</span>;
+  }
 
   return (
     <main className="p-6">
@@ -153,6 +181,8 @@ export default function Dashboard() {
                   <div className="mb-2">
                     <p className="font-semibold text-gray-800">{c.title}</p>
                     <p className="text-sm text-gray-500">{c.client_email}</p>
+                    {/* due-date badge */}
+                    <DueBadge date={c.due_date} />
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -179,14 +209,23 @@ export default function Dashboard() {
                       ))}
                     </div>
 
-                    {/* color picker */}
-                    <input
-                      type="color"
-                      value={c.color || "#3b82f6"}
-                      onChange={(e) => changeColor(c.id, e.target.value)}
-                      className="w-6 h-6 rounded cursor-pointer border ml-2"
-                      title="Change color"
-                    />
+                    {/* color + due date picker row */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={c.due_date ? c.due_date.substring(0, 10) : ""}
+                        onChange={(e) => changeDueDate(c.id, e.target.value)}
+                        className="w-28 h-6 text-xs rounded cursor-pointer border"
+                        title="Due date"
+                      />
+                      <input
+                        type="color"
+                        value={c.color || "#3b82f6"}
+                        onChange={(e) => changeColor(c.id, e.target.value)}
+                        className="w-6 h-6 rounded cursor-pointer border"
+                        title="Change color"
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
