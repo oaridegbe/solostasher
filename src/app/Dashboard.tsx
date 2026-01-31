@@ -23,12 +23,10 @@ export default function Dashboard() {
     const { cardId } = JSON.parse(e.dataTransfer.getData("text/plain"));
     if (!cardId) return;
 
-    // instant UI move
     setCards(prev =>
       prev.map(c => (c.id === cardId ? { ...c, status: newStatus } : c))
     );
 
-    // background save
     fetch("/api/move", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -37,7 +35,20 @@ export default function Dashboard() {
   }
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault(); // allow drop
+    e.preventDefault();
+  }
+
+  // -----  change card color  -----
+  async function changeColor(cardId: string, newColor: string) {
+    setCards(prev =>
+      prev.map(c => (c.id === cardId ? { ...c, color: newColor } : c))
+    );
+
+    fetch("/api/color", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId, color: newColor })
+    }).catch(err => console.error("Color update failed", err));
   }
 
   // -----  new deal  -----
@@ -58,7 +69,7 @@ export default function Dashboard() {
     <main className="p-6">
       <h1 className="text-2xl font-bold mb-4">SoloStasher Board</h1>
 
-      {/* NEW DEAL FORM with color picker */}
+      {/* NEW DEAL FORM */}
       <div className="mb-4 flex items-center gap-2">
         <input id="title" placeholder="Deal title" className="px-3 py-2 border rounded" />
         <input id="email" placeholder="Client email" className="px-3 py-2 border rounded" />
@@ -68,7 +79,7 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* KANBAN GRID with native drag */}
+      {/* KANBAN GRID with native drag + per-card color picker */}
       <div className="flex gap-4">
         {columns.map(col => (
           <div
@@ -85,11 +96,19 @@ export default function Dashboard() {
                   key={c.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, c.id, col)}
-                  className="bg-white p-3 mb-2 rounded shadow cursor-move"
+                  className="bg-white p-3 mb-2 rounded shadow cursor-move relative"
                   style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
                 >
                   <p className="font-semibold">{c.title}</p>
                   <p className="text-sm text-gray-500">{c.client_email}</p>
+                  {/* tiny color picker bottom-right */}
+                  <input
+                    type="color"
+                    value={c.color || "#3b82f6"}
+                    onChange={(e) => changeColor(c.id, e.target.value)}
+                    className="absolute bottom-1 right-1 w-5 h-5 rounded cursor-pointer border"
+                    title="Change color"
+                  />
                 </div>
               ))}
           </div>
