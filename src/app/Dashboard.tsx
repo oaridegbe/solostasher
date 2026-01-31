@@ -179,7 +179,7 @@ export default function Dashboard() {
                   style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
                 >
                   {/* top row: due date left, color right */}
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-2 flex-row-reverse">
                     <DueBadge date={c.due_date} />
                     <input
                       type="color"
