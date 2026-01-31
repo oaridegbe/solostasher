@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-const columns = ["inquiry", "quoted", "won", "followup"];
+const columns = ["inquiry", "quoted", "completed", "follow-up"];
 const allTags = ["Hot", "Recurring", "Upsell"];
 
 export default function Dashboard() {
