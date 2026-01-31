@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 
 const columns = ["inquiry", "quoted", "won", "followup"];
-const allTags = ["Hot", "Follow-up", "Referral", "Upsell", "Closed Lost"]; // editable list
+const allTags = ["Hot", "Follow-up", "Referral", "Upsell", "Closed Lost"];
 
 export default function Dashboard() {
   const [cards, setCards] = useState<any[]>([]);
@@ -144,4 +144,56 @@ export default function Dashboard() {
             onDrop={(e) => handleDrop(e, col)}
             onDragOver={handleDragOver}
           >
-            <h2 className="font-bold capitalize mb-
+            <h2 className="font-bold capitalize mb-2">{col}</h2>
+            {visibleCards
+              .filter(c => c.status === col)
+              .map((c) => (
+                <div
+                  key={c.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, c.id, col)}
+                  className="bg-white p-3 mb-2 rounded shadow cursor-move relative"
+                  style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
+                >
+                  <p className="font-semibold">{c.title}</p>
+                  <p className="text-sm text-gray-500">{c.client_email}</p>
+
+                  {/* color picker */}
+                  <input
+                    type="color"
+                    value={c.color || "#3b82f6"}
+                    onChange={(e) => changeColor(c.id, e.target.value)}
+                    className="absolute bottom-1 right-8 w-5 h-5 rounded cursor-pointer border"
+                    title="Change color"
+                  />
+
+                  {/* tag multi-select */}
+                  <div className="absolute bottom-1 left-1 flex gap-1 flex-wrap">
+                    {allTags.map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => {
+                          const current = (c.tags || "").split(",").filter(Boolean);
+                          const next = current.includes(tag)
+                            ? current.filter(t => t !== tag)
+                            : [...current, tag];
+                          changeTags(c.id, next);
+                        }}
+                        className={`text-xs px-1 rounded border ${
+                          (c.tags || "").split(",").includes(tag)
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-white text-gray-700 border-gray-300"
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        ))}
+      </div>
+    </main>
+  );
+}
