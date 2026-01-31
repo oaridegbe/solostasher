@@ -2,9 +2,11 @@
 import { useEffect, useState } from "react";
 
 const columns = ["inquiry", "quoted", "won", "followup"];
+const allTags = ["Hot", "Follow-up", "Referral", "Upsell", "Closed Lost"]; // editable list
 
 export default function Dashboard() {
   const [cards, setCards] = useState<any[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/api/cards")
@@ -51,35 +53,89 @@ export default function Dashboard() {
     }).catch(err => console.error("Color update failed", err));
   }
 
+  // -----  change card tags  -----
+  async function changeTags(cardId: string, newTags: string[]) {
+    const tagsStr = newTags.join(",");
+    setCards(prev =>
+      prev.map(c => (c.id === cardId ? { ...c, tags: tagsStr } : c))
+    );
+
+    fetch("/api/tags", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId, tags: tagsStr })
+    }).catch(err => console.error("Tags update failed", err));
+  }
+
   // -----  new deal  -----
   async function createDeal() {
     const title = (document.getElementById("title") as HTMLInputElement).value;
     const email = (document.getElementById("email") as HTMLInputElement).value;
     const color = (document.getElementById("color") as HTMLInputElement).value;
+    const tags = (document.getElementById("tags") as HTMLInputElement).value
+      .split(",")
+      .map(t => t.trim())
+      .filter(Boolean);
     if (!title) return;
     await fetch("/api/cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, email, color })
+      body: JSON.stringify({ title, email, color, tags: tags.join(",") })
     });
     location.reload();
   }
+
+  // -----  filter by selected tags  -----
+  const visibleCards = selectedTags.length
+    ? cards.filter(c => selectedTags.some(t => (c.tags || "").split(",").includes(t)))
+    : cards;
 
   return (
     <main className="p-6">
       <h1 className="text-2xl font-bold mb-4">SoloStasher Board</h1>
 
-      {/* NEW DEAL FORM */}
-      <div className="mb-4 flex items-center gap-2">
+      {/* NEW DEAL FORM with tags */}
+      <div className="mb-4 flex items-center gap-2 flex-wrap">
         <input id="title" placeholder="Deal title" className="px-3 py-2 border rounded" />
         <input id="email" placeholder="Client email" className="px-3 py-2 border rounded" />
         <input id="color" type="color" className="w-10 h-10 border rounded cursor-pointer" defaultValue="#3b82f6" />
+        <input id="tags" placeholder="Tags (comma sep)" className="px-3 py-2 border rounded" />
         <button onClick={createDeal} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
           + New Deal
         </button>
       </div>
 
-      {/* KANBAN GRID with native drag + per-card color picker */}
+      {/* TAG FILTER BAR */}
+      <div className="mb-4 flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-medium">Filter:</span>
+        {allTags.map(tag => (
+          <button
+            key={tag}
+            onClick={() =>
+              setSelectedTags(prev =>
+                prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+              )
+            }
+            className={`px-2 py-1 text-xs rounded border ${
+              selectedTags.includes(tag)
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "bg-white text-gray-700 border-gray-300"
+            }`}
+          >
+            {tag}
+          </button>
+        ))}
+        {selectedTags.length > 0 && (
+          <button
+            onClick={() => setSelectedTags([])}
+            className="px-2 py-1 text-xs rounded border bg-gray-200 text-gray-700"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* KANBAN GRID with native drag + per-card controls */}
       <div className="flex gap-4">
         {columns.map(col => (
           <div
@@ -88,32 +144,4 @@ export default function Dashboard() {
             onDrop={(e) => handleDrop(e, col)}
             onDragOver={handleDragOver}
           >
-            <h2 className="font-bold capitalize mb-2">{col}</h2>
-            {cards
-              .filter(c => c.status === col)
-              .map((c) => (
-                <div
-                  key={c.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, c.id, col)}
-                  className="bg-white p-3 mb-2 rounded shadow cursor-move relative"
-                  style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
-                >
-                  <p className="font-semibold">{c.title}</p>
-                  <p className="text-sm text-gray-500">{c.client_email}</p>
-                  {/* tiny color picker bottom-right */}
-                  <input
-                    type="color"
-                    value={c.color || "#3b82f6"}
-                    onChange={(e) => changeColor(c.id, e.target.value)}
-                    className="absolute bottom-1 right-1 w-5 h-5 rounded cursor-pointer border"
-                    title="Change color"
-                  />
-                </div>
-              ))}
-          </div>
-        ))}
-      </div>
-    </main>
-  );
-}
+            <h2 className="font-bold capitalize mb-
