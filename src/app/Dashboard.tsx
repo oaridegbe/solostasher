@@ -215,8 +215,8 @@ export default function Dashboard() {
                         type="date"
                         value={c.due_date ? c.due_date.substring(0, 10) : ""}
                         onChange={(e) => changeDueDate(c.id, e.target.value)}
-                        className="w-28 h-6 text-xs rounded cursor-pointer border"
-                        title="Due date"
+                        className="w-20 h-5 text-xs rounded cursor-pointer border"
+                        title="Due"
                       />
                       <input
                         type="color"
