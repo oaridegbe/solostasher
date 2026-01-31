@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-const columns = ["inquiry", "quoted", "completed", "follow-up"];
+const columns = ["inquiry", "quoted", "completed", "followup"];
 const allTags = ["Hot", "Recurring", "Upsell"];
 
 export default function Dashboard() {
@@ -67,20 +67,16 @@ export default function Dashboard() {
     }).catch(err => console.error("Tags update failed", err));
   }
 
-  // -----  new deal  -----
+  // -----  new deal  (NO free-form tags input) -----
   async function createDeal() {
     const title = (document.getElementById("title") as HTMLInputElement).value;
     const email = (document.getElementById("email") as HTMLInputElement).value;
     const color = (document.getElementById("color") as HTMLInputElement).value;
-    const tags = (document.getElementById("tags") as HTMLInputElement).value
-      .split(",")
-      .map(t => t.trim())
-      .filter(Boolean);
     if (!title) return;
     await fetch("/api/cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, email, color, tags: tags.join(",") })
+      body: JSON.stringify({ title, email, color, tags: "" }) // no tags from form
     });
     location.reload();
   }
@@ -94,18 +90,17 @@ export default function Dashboard() {
     <main className="p-6">
       <h1 className="text-2xl font-bold mb-4">SoloStasher Board</h1>
 
-      {/* NEW DEAL FORM with tags */}
-      <div className="mb-4 flex items-center gap-2 flex-wrap">
+      {/* NEW DEAL FORM: Title, Email, Color, New Deal only */}
+      <div className="mb-4 flex items-center gap-2">
         <input id="title" placeholder="Deal title" className="px-3 py-2 border rounded" />
         <input id="email" placeholder="Client email" className="px-3 py-2 border rounded" />
         <input id="color" type="color" className="w-10 h-10 border rounded cursor-pointer" defaultValue="#3b82f6" />
-        <input id="tags" placeholder="Tags (comma sep)" className="px-3 py-2 border rounded" />
         <button onClick={createDeal} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
           + New Deal
         </button>
       </div>
 
-      {/* TAG FILTER BAR */}
+      {/* TAG FILTER BAR (chip only) */}
       <div className="mb-4 flex items-center gap-2 flex-wrap">
         <span className="text-sm font-medium">Filter:</span>
         {allTags.map(tag => (
