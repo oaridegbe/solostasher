@@ -178,8 +178,8 @@ export default function Dashboard() {
                   className="bg-white p-4 mb-3 rounded shadow cursor-move relative flex flex-col justify-between min-h-[100px]"
                   style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
                 >
-                  {/* top row: due date left, color right */}
-                  <div className="flex items-center justify-between mb-2 flex-row-reverse">
+                  {/* top row: due date right, badge left */}
+                  <div className="flex items-center justify-between mb-2">
                     <DueBadge date={c.due_date} />
                     <input
                       type="date"
@@ -196,27 +196,37 @@ export default function Dashboard() {
                     <p className="text-sm text-gray-500">{c.client_email}</p>
                   </div>
 
-                  {/* bottom row: tags (single line) */}
-                  <div className="flex gap-1 flex-nowrap">
-                    {allTags.map(tag => (
-                      <button
-                        key={tag}
-                        onClick={() => {
-                          const current = (c.tags || "").split(",").filter(Boolean);
-                          const next = current.includes(tag)
-                            ? current.filter(t => t !== tag)
-                            : [...current, tag];
-                          changeTags(c.id, next);
-                        }}
-                        className={`text-xs px-2 py-1 rounded border whitespace-nowrap ${
-                          (c.tags || "").split(",").includes(tag)
-                            ? "bg-indigo-600 text-white border-indigo-600"
-                            : "bg-white text-gray-700 border-gray-300"
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    ))}
+                  {/* bottom row: tags left, color right */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-1 flex-nowrap">
+                      {allTags.map(tag => (
+                        <button
+                          key={tag}
+                          onClick={() => {
+                            const current = (c.tags || "").split(",").filter(Boolean);
+                            const next = current.includes(tag)
+                              ? current.filter(t => t !== tag)
+                              : [...current, tag];
+                            changeTags(c.id, next);
+                          }}
+                          className={`text-xs px-2 py-1 rounded border whitespace-nowrap ${
+                            (c.tags || "").split(",").includes(tag)
+                              ? "bg-indigo-600 text-white border-indigo-600"
+                              : "bg-white text-gray-700 border-gray-300"
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+
+                    <input
+                      type="color"
+                      value={c.color || "#3b82f6"}
+                      onChange={(e) => changeColor(c.id, e.target.value)}
+                      className="w-5 h-5 rounded cursor-pointer border"
+                      title="Color"
+                    />
                   </div>
                 </div>
               ))}
