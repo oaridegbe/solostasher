@@ -80,6 +80,38 @@ export default function Dashboard() {
     }).catch(err => console.error("Due-date update failed", err));
   }
 
+  // -----  file uploads  -----
+  async function uploadFiles(cardId: string, files: FileList) {
+    const form = new FormData();
+    for (let i = 0; i < files.length; i++) form.append("file", files[i]);
+    const res = await fetch("/api/upload", { method: "POST", body: form });
+    if (!res.ok) return;
+    const urls = await res.json(); // array of {url, name}
+    const current = JSON.parse((c.files || "[]") as string) as {url: string; name: string}[];
+    const next = [...current, ...urls];
+    setCards(prev =>
+      prev.map(c => (c.id === cardId ? { ...c, files: JSON.stringify(next) } : c))
+    );
+    fetch("/api/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId, files: JSON.stringify(next) })
+    }).catch(err => console.error("Files update failed", err));
+  }
+
+  async function removeFile(cardId: string, urlToRemove: string) {
+    const current = JSON.parse((c.files || "[]") as string) as {url: string; name: string}[];
+    const next = current.filter(f => f.url !== urlToRemove);
+    setCards(prev =>
+      prev.map(c => (c.id === cardId ? { ...c, files: JSON.stringify(next) } : c))
+  );
+    fetch("/api/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId, files: JSON.stringify(next) })
+    }).catch(err => console.error("Files update failed", err));
+  }
+
   // -----  new deal  (no free-form tags input) -----
   async function createDeal() {
     const title = (document.getElementById("title") as HTMLInputElement).value;
@@ -89,7 +121,7 @@ export default function Dashboard() {
     await fetch("/api/cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, email, color, tags: "", due_date: "" }) // no tags, no due date from form
+      body: JSON.stringify({ title, email, color, tags: "", due_date: "", files: "[]" }) // empty files
     });
     location.reload();
   }
@@ -112,6 +144,30 @@ export default function Dashboard() {
       return <span className="ml-2 px-2 py-0.5 text-xs rounded bg-orange-500 text-white">Today</span>;
     }
     return <span className="ml-2 px-2 py-0.5 text-xs rounded bg-gray-200 text-gray-800">{diff}d</span>;
+  }
+
+  // -----  file list inside card  -----
+  function FileList({ card }: { card: any }) {
+    const files = JSON.parse((card.files || "[]") as string) as { url: string; name: string }[];
+    if (files.length === 0) return null;
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {files.map(f => (
+          <div key={f.url} className="flex items-center gap-1 bg-gray-100 rounded p-1 text-xs">
+            <a href={f.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+              {f.name}
+            </a>
+            <button
+              onClick={() => removeFile(card.id, f.url)}
+              className="text-red-500 hover:text-red-700"
+              title="Remove"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -155,7 +211,7 @@ export default function Dashboard() {
           >
             Clear
           </button>
-        )}
+        ))}
       </div>
 
       {/* KANBAN GRID with native drag + per-card controls */}
@@ -176,63 +232,4 @@ export default function Dashboard() {
                   draggable
                   onDragStart={(e) => handleDragStart(e, c.id, col)}
                   className="bg-white p-4 mb-3 rounded shadow cursor-move relative flex flex-col justify-between min-h-[100px]"
-                  style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
-                >
-                  {/* top row: due date right, badge left */}
-                  <div className="flex items-center justify-between mb-2 flex-row-reverse">
-                    <DueBadge date={c.due_date} />
-                    <input
-                      type="date"
-                      value={c.due_date ? c.due_date.substring(0, 10) : ""}
-                      onChange={(e) => changeDueDate(c.id, e.target.value)}
-                      className="w-20 h-5 text-xs rounded cursor-pointer border"
-                      title="Due"
-                    />
-                  </div>
-
-                  {/* middle: title + email */}
-                  <div className="mb-2">
-                    <p className="font-semibold text-gray-800">{c.title}</p>
-                    <p className="text-sm text-gray-500">{c.client_email}</p>
-                  </div>
-
-                  {/* bottom row: tags left, color right */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-1 flex-nowrap">
-                      {allTags.map(tag => (
-                        <button
-                          key={tag}
-                          onClick={() => {
-                            const current = (c.tags || "").split(",").filter(Boolean);
-                            const next = current.includes(tag)
-                              ? current.filter(t => t !== tag)
-                              : [...current, tag];
-                            changeTags(c.id, next);
-                          }}
-                          className={`text-xs px-2 py-1 rounded border whitespace-nowrap ${
-                            (c.tags || "").split(",").includes(tag)
-                              ? "bg-indigo-600 text-white border-indigo-600"
-                              : "bg-white text-gray-700 border-gray-300"
-                          }`}
-                        >
-                          {tag}
-                        </button>
-                      ))}
-                    </div>
-
-                    <input
-                      type="color"
-                      value={c.color || "#3b82f6"}
-                      onChange={(e) => changeColor(c.id, e.target.value)}
-                      className="w-5 h-5 rounded cursor-pointer border"
-                      title="Color"
-                    />
-                  </div>
-                </div>
-              ))}
-          </div>
-        ))}
-      </div>
-    </main>
-  );
-}
+                  style={{ borderLeft: `5px solid ${c.color || "#3b82
