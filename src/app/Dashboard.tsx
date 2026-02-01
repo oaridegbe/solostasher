@@ -281,7 +281,7 @@ export default function Dashboard() {
                         type="file"
                         multiple
                         onChange={(e) => e.target.files && uploadFiles(c.id, e.target.files)}
-                        className="w-14 h-5 text-xs rounded cursor-pointer border"
+                        className="hidden"
                         title="Attach file"
                       />
                       <input
