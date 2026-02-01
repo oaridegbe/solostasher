@@ -252,7 +252,7 @@ export default function Dashboard() {
                     <p className="text-sm text-gray-500">{c.client_email}</p>
                   </div>
 
-                  {/* bottom row: tags left, color right */}
+                  {/* bottom row: tags left, file + color right */}
                   <div className="flex items-center justify-between">
                     <div className="flex gap-1 flex-nowrap">
                       {allTags.map(tag => (
@@ -276,13 +276,22 @@ export default function Dashboard() {
                       ))}
                     </div>
 
-                    <input
-                      type="color"
-                      value={c.color || "#3b82f6"}
-                      onChange={(e) => changeColor(c.id, e.target.value)}
-                      className="w-5 h-5 rounded cursor-pointer border"
-                      title="Color"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => e.target.files && uploadFiles(c.id, e.target.files)}
+                        className="w-20 h-5 text-xs rounded cursor-pointer border"
+                        title="Attach file"
+                      />
+                      <input
+                        type="color"
+                        value={c.color || "#3b82f6"}
+                        onChange={(e) => changeColor(c.id, e.target.value)}
+                        className="w-5 h-5 rounded cursor-pointer border"
+                        title="Color"
+                      />
+                    </div>
                   </div>
 
                   {/* file list inside card */}
