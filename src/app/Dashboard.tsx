@@ -87,7 +87,7 @@ export default function Dashboard() {
     const res = await fetch("/api/upload", { method: "POST", body: form });
     if (!res.ok) return;
     const urls = await res.json(); // array of {url, name}
-    const current = JSON.parse((c.files || "[]") as string) as {url: string; name: string}[];
+    const current = JSON.parse((cards.find(c => c.id === cardId)?.files || "[]") as string) as {url: string; name: string}[];
     const next = [...current, ...urls];
     setCards(prev =>
       prev.map(c => (c.id === cardId ? { ...c, files: JSON.stringify(next) } : c))
@@ -100,7 +100,7 @@ export default function Dashboard() {
   }
 
   async function removeFile(cardId: string, urlToRemove: string) {
-    const current = JSON.parse((c.files || "[]") as string) as {url: string; name: string}[];
+    const current = JSON.parse((cards.find(c => c.id === cardId)?.files || "[]") as string) as {url: string; name: string}[];
     const next = current.filter(f => f.url !== urlToRemove);
     setCards(prev =>
       prev.map(c => (c.id === cardId ? { ...c, files: JSON.stringify(next) } : c))
@@ -128,7 +128,7 @@ export default function Dashboard() {
 
   // -----  filter by selected tags  -----
   const visibleCards = selectedTags.length
-    ? cards.filter(c => selectedTags.some(t => (c.tags || "").split(",").includes(t)))
+    ? cards.filter(c => selectedTags.some((t: string) => (c.tags || "").split(",").includes(t)))
     : cards;
 
   // -----  due-date badge  -----
@@ -211,7 +211,7 @@ export default function Dashboard() {
           >
             Clear
           </button>
-        ))}
+        )}
       </div>
 
       {/* KANBAN GRID with native drag + per-card controls */}
