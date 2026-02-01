@@ -182,11 +182,11 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between mb-2 flex-row-reverse">
                     <DueBadge date={c.due_date} />
                     <input
-                      type="color"
-                      value={c.color || "#3b82f6"}
-                      onChange={(e) => changeColor(c.id, e.target.value)}
-                      className="w-5 h-5 rounded cursor-pointer border"
-                      title="Color"
+                      type="date"
+                      value={c.due_date ? c.due_date.substring(0, 10) : ""}
+                      onChange={(e) => changeDueDate(c.id, e.target.value)}
+                      className="w-20 h-5 text-xs rounded cursor-pointer border"
+                      title="Due"
                     />
                   </div>
 
