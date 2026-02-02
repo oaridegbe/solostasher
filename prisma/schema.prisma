@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Card {
+  id                  String    @id @default(uuid())
+  title               String
+  clientEmail         String?   @map("client_email")
+  status              String    @default("inquiry")
+  color               String    @default("#3b82f6")
+  tags                String    @default("")
+  dueDate             DateTime? @map("due_date")
+  files               String    @default("[]")
+  isRecurring         Boolean   @default(false) @map("is_recurring")
+  recurrencePattern   String?   @map("recurrence_pattern")
+  notifyEmail         Boolean   @default(false) @map("notify_email")
+  customEmail         String?   @map("custom_email")
+  slackWebhook        String?   @map("slack_webhook")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  
+  comments            Comment[]
+  activityLogs        ActivityLog[]
+  notifications       NotificationQueue?
+  
+  @@map("cards")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  cardId    String   @map("card_id")
+  text      String
+  author    String   @default("User")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  @@map("comments")
+  @@index([cardId])
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  cardId    String   @map("card_id")
+  action    String
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  @@map("activity_log")
+  @@index([cardId])
+}
+
+model NotificationQueue {
+  id           String    @id @default(uuid())
+  cardId       String    @unique @map("card_id")
+  dueDate      DateTime  @map("due_date")
+  email        String?
+  slackWebhook String?   @map("slack_webhook")
+  status       String    @default("pending")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  
+  card         Card      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  @@map("notification_queue")
+  @@index([status, dueDate])
+}

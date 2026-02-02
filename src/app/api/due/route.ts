@@ -1,19 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@libsql/client";
-import { getServerSession } from "next-auth/next";
-
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL!,
-  authToken: process.env.TURSO_AUTH_TOKEN!,
-});
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession();
-  if (!session?.user) return NextResponse.json({ ok: false });
-  const { cardId, due_date } = await req.json();
-  await db.execute(
-    "UPDATE cards SET due_date = ? WHERE id = ? AND user_id = ?",
-    [String(due_date), String(cardId), String((session.user as any).id)]
-  );
-  return NextResponse.json({ ok: true });
+  try {
+    const { cardId, due_date } = await req.json();
+    await prisma.card.update({
+      where: { id: cardId },
+      data: { dueDate: due_date ? new Date(due_date) : null }
+    });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to update due date' }, { status: 500 });
+  }
 }

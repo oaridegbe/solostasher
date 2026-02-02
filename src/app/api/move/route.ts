@@ -1,19 +1,25 @@
-import { createClient } from "@libsql/client";
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL!,
-  authToken: process.env.TURSO_AUTH_TOKEN!,
-});
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession();
-  if (!session?.user) return NextResponse.json({ ok: false });
-  const body = await req.json();
-  await db.execute(
-    "UPDATE cards SET status = ? WHERE id = ? AND user_id = ?",
-    [String(body.newStatus), String(body.cardId), String((session.user as any).id)]
-  );
-  return NextResponse.json({ ok: true });
+  try {
+    const { cardId, newStatus } = await req.json();
+    
+    await prisma.$transaction([
+      prisma.card.update({
+        where: { id: cardId },
+        data: { status: newStatus }
+      }),
+      prisma.activityLog.create({
+        data: {
+          cardId,
+          action: `Moved to ${newStatus}`
+        }
+      })
+    ]);
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to move card' }, { status: 500 });
+  }
 }

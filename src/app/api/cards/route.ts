@@ -1,31 +1,46 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@libsql/client";
-import { getServerSession } from "next-auth/next";
-import crypto from "crypto";
-
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL!,
-  authToken: process.env.TURSO_AUTH_TOKEN!,
-});
-
-export async function POST(req: NextRequest) {
-  const session = await getServerSession();
-  if (!session?.user) return NextResponse.json({ ok: false });
-  const body = await req.json();
-  const id = crypto.randomUUID();
-  await db.execute(
-    "INSERT INTO cards (id, user_id, title, client_email, status, color) VALUES (?, ?, ?, ?, ?, ?)",
-    [String(id), String((session.user as any).id), String(body.title), String(body.email), "inquiry", String(body.color)]
-  );
-  return NextResponse.json({ ok: true });
-}
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
 
 export async function GET() {
-  const session = await getServerSession();
-  if (!session?.user) return NextResponse.json([]);
-  const rs = await db.execute(
-    "SELECT * FROM cards WHERE user_id = ? ORDER BY created_at DESC",
-    [String((session.user as any).id)]
-  );
-  return NextResponse.json(rs.rows);
+  try {
+    const cards = await prisma.card.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    return NextResponse.json(cards);
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: 'Failed to fetch cards' }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { title, email, color, tags, due_date, files, status, is_recurring } = body;
+    
+    const card = await prisma.card.create({
+      data: {
+        title,
+        clientEmail: email,
+        color: color || '#3b82f6',
+        tags: tags || '',
+        dueDate: due_date ? new Date(due_date) : null,
+        files: files || '[]',
+        status: status || 'inquiry',
+        isRecurring: is_recurring || false,
+      }
+    });
+    
+    await prisma.activityLog.create({
+      data: {
+        cardId: card.id,
+        action: 'Card created'
+      }
+    });
+    
+    return NextResponse.json(card, { status: 201 });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: 'Failed to create card' }, { status: 500 });
+  }
 }
