@@ -27,10 +27,21 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetch("/api/cards")
-      .then((r) => r.json())
-      .then(setCards)
-      .catch(() => setCards([]));
-  }, []);
+    .then((r) => r.json())
+    .then((data) => {
+      // Ensure we always have an array, even if API fails
+      if (Array.isArray(data)) {
+        setCards(data);
+      } else {
+        console.error("API didn't return array:", data);
+        setCards([]);
+      }
+    })
+    .catch((err) => {
+      console.error("Fetch error:", err);
+      setCards([]);
+    });
+}, []);
 
   // Drag & Drop
   function handleDragStart(e: React.DragEvent<HTMLDivElement>, cardId: string) {
