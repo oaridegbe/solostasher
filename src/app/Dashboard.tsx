@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 
 const columns = ["inquiry", "quoted", "completed", "followup"];
 const allTags = ["Hot", "Recurring", "Upsell"];
@@ -8,20 +8,22 @@ const allTags = ["Hot", "Recurring", "Upsell"];
 interface Card {
   id: string;
   title: string;
+  client_email?: string;
   status: string;
   color?: string;
   tags?: string;
   due_date?: string;
   files?: string;
-  client_email?: string;
-  is_recurring?: boolean;
+}
+
+interface FileAttachment {
+  url: string;
+  name: string;
 }
 
 export default function Dashboard() {
   const [cards, setCards] = useState<Card[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [uploading, setUploading] = useState<string | null>(null);
-  const fileInputRefs = useRef<{[key: string]: HTMLInputElement | null}>({});
 
   useEffect(() => {
     fetch("/api/cards")
@@ -30,7 +32,8 @@ export default function Dashboard() {
       .catch(() => setCards([]));
   }, []);
 
-  async function handleDragStart(e: React.DragEvent<HTMLDivElement>, cardId: string) {
+  // Drag & Drop
+  function handleDragStart(e: React.DragEvent<HTMLDivElement>, cardId: string) {
     e.dataTransfer.setData("text/plain", JSON.stringify({ cardId }));
   }
 
@@ -38,110 +41,111 @@ export default function Dashboard() {
     e.preventDefault();
     const data = e.dataTransfer.getData("text/plain");
     if (!data) return;
+    
     const { cardId } = JSON.parse(data);
     if (!cardId) return;
 
-    setCards(prev => prev.map(c => (c.id === cardId ? { ...c, status: newStatus } : c)));
+    setCards((prev) =>
+      prev.map((c) => (c.id === cardId ? { ...c, status: newStatus } : c))
+    );
 
-    fetch("/api/move", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, newStatus })
-    }).catch(err => console.error("Move failed", err));
+    try {
+      await fetch("/api/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId, newStatus }),
+      });
+    } catch (err) {
+      console.error("Move failed", err);
+    }
   }
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
   }
 
+  // Change color
   async function changeColor(cardId: string, newColor: string) {
-    setCards(prev => prev.map(c => (c.id === cardId ? { ...c, color: newColor } : c)));
+    setCards((prev) =>
+      prev.map((c) => (c.id === cardId ? { ...c, color: newColor } : c))
+    );
+
     fetch("/api/color", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, color: newColor })
-    }).catch(err => console.error("Color update failed", err));
+      body: JSON.stringify({ cardId, color: newColor }),
+    }).catch((err) => console.error("Color update failed", err));
   }
 
+  // Change tags
   async function changeTags(cardId: string, newTags: string[]) {
     const tagsStr = newTags.join(",");
-    setCards(prev => prev.map(c => (c.id === cardId ? { ...c, tags: tagsStr } : c)));
+    setCards((prev) =>
+      prev.map((c) => (c.id === cardId ? { ...c, tags: tagsStr } : c))
+    );
+
     fetch("/api/tags", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, tags: tagsStr })
-    }).catch(err => console.error("Tags update failed", err));
+      body: JSON.stringify({ cardId, tags: tagsStr }),
+    }).catch((err) => console.error("Tags update failed", err));
   }
 
+  // Change due date
   async function changeDueDate(cardId: string, newDate: string) {
-    setCards(prev => prev.map(c => (c.id === cardId ? { ...c, due_date: newDate } : c)));
+    setCards((prev) =>
+      prev.map((c) => (c.id === cardId ? { ...c, due_date: newDate } : c))
+    );
+
     fetch("/api/due", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, due_date: newDate })
-    }).catch(err => console.error("Due-date update failed", err));
+      body: JSON.stringify({ cardId, due_date: newDate }),
+    }).catch((err) => console.error("Due-date update failed", err));
   }
 
-  async function uploadFiles(cardId: string, files: FileList | null) {
-    console.log("uploadFiles called", cardId, files?.length);
-    if (!files || files.length === 0) {
-      console.log("No files selected");
-      return;
-    }
+  // File uploads
+  async function uploadFiles(cardId: string, files: FileList) {
+    const form = new FormData();
+    for (let i = 0; i < files.length; i++) form.append("file", files[i]);
     
-    setUploading(cardId);
     try {
-      const form = new FormData();
-      for (let i = 0; i < files.length; i++) {
-        form.append("file", files[i]);
-        console.log("Appending file:", files[i].name);
-      }
-      
       const res = await fetch("/api/upload", { method: "POST", body: form });
-      console.log("Upload response status:", res.status);
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errorText}`);
-      }
-      
-      const urls = await res.json();
-      console.log("Upload success:", urls);
-      
-      const currentCard = cards.find(c => c.id === cardId);
-      const current = JSON.parse(currentCard?.files || "[]");
+      if (!res.ok) return;
+      const urls: FileAttachment[] = await res.json();
+      const current = JSON.parse((cards.find((c) => c.id === cardId)?.files || "[]") as string) as FileAttachment[];
       const next = [...current, ...urls];
       
-      setCards(prev => prev.map(c => (c.id === cardId ? { ...c, files: JSON.stringify(next) } : c)));
+      setCards((prev) =>
+        prev.map((c) => (c.id === cardId ? { ...c, files: JSON.stringify(next) } : c))
+      );
       
-      await fetch("/api/files", {
+      fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardId, files: JSON.stringify(next) })
-      });
-      
+        body: JSON.stringify({ cardId, files: JSON.stringify(next) }),
+      }).catch((err) => console.error("Files update failed", err));
     } catch (err) {
       console.error("Upload error:", err);
-      alert("Upload failed: " + (err as Error).message);
-    } finally {
-      setUploading(null);
-      const input = fileInputRefs.current[cardId];
-      if (input) input.value = "";
     }
   }
 
   async function removeFile(cardId: string, urlToRemove: string) {
-    const currentCard = cards.find(c => c.id === cardId);
-    const current = JSON.parse(currentCard?.files || "[]");
-    const next = current.filter((f: any) => f.url !== urlToRemove);
-    setCards(prev => prev.map(c => (c.id === cardId ? { ...c, files: JSON.stringify(next) } : c)));
+    const current = JSON.parse((cards.find((c) => c.id === cardId)?.files || "[]") as string) as FileAttachment[];
+    const next = current.filter((f) => f.url !== urlToRemove);
+    
+    setCards((prev) =>
+      prev.map((c) => (c.id === cardId ? { ...c, files: JSON.stringify(next) } : c))
+    );
+    
     fetch("/api/files", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, files: JSON.stringify(next) })
-    }).catch(err => console.error("Files update failed", err));
+      body: JSON.stringify({ cardId, files: JSON.stringify(next) }),
+    }).catch((err) => console.error("Files update failed", err));
   }
 
+  // New deal
   async function createDeal() {
     const titleInput = document.getElementById("title") as HTMLInputElement;
     const emailInput = document.getElementById("email") as HTMLInputElement;
@@ -152,35 +156,77 @@ export default function Dashboard() {
     const color = colorInput?.value;
     
     if (!title) return;
-    
+
     await fetch("/api/cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, email, color, tags: "", due_date: "", files: "[]", status: "inquiry", is_recurring: false })
+      body: JSON.stringify({ 
+        title, 
+        email, 
+        color, 
+        tags: "", 
+        due_date: "", 
+        files: "[]",
+        status: "inquiry"
+      }),
     });
+    
     location.reload();
   }
 
+  // Filter
   const visibleCards = selectedTags.length
-    ? cards.filter(c => selectedTags.some((t: string) => (c.tags || "").split(",").includes(t)))
+    ? cards.filter((c) => selectedTags.some((t: string) => (c.tags || "").split(",").includes(t)))
     : cards;
 
+  // Due badge component
   function DueBadge({ date }: { date?: string }) {
     if (!date) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const due = new Date(date);
     const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    if (diff < 0) return <span className="px-2 py-0.5 text-xs rounded bg-red-500 text-white">Overdue</span>;
-    if (diff === 0) return <span className="px-2 py-0.5 text-xs rounded bg-orange-500 text-white">Today</span>;
-    return <span className="px-2 py-0.5 text-xs rounded bg-gray-200 text-gray-800">{diff}d</span>;
+    
+    if (diff < 0) {
+      return <span className="ml-2 px-2 py-0.5 text-xs rounded bg-red-500 text-white">Overdue</span>;
+    }
+    if (diff === 0) {
+      return <span className="ml-2 px-2 py-0.5 text-xs rounded bg-orange-500 text-white">Today</span>;
+    }
+    return <span className="ml-2 px-2 py-0.5 text-xs rounded bg-gray-200 text-gray-800">{diff}d</span>;
+  }
+
+  // File list component
+  function FileList({ card }: { card: Card }) {
+    const files: FileAttachment[] = JSON.parse((card.files || "[]") as string);
+    if (files.length === 0) return null;
+    
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {files.map((f) => (
+          <div key={f.url} className="flex items-center gap-1 bg-gray-100 rounded p-1 text-xs">
+            <a href={f.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+              {f.name}
+            </a>
+            <button
+              onClick={() => removeFile(card.id, f.url)}
+              className="text-red-500 hover:text-red-700"
+              title="Remove"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
-    <main className="p-6 max-w-7xl mx-auto">
+    <main className="p-6">
       <h1 className="text-2xl font-bold mb-4">SoloStasher Board</h1>
 
-      <div className="mb-4 flex items-center gap-2 flex-wrap">
+      {/* New Deal Form */}
+      <div className="mb-4 flex items-center gap-2">
         <input id="title" placeholder="Deal title" className="px-3 py-2 border rounded" />
         <input id="email" placeholder="Client email" className="px-3 py-2 border rounded" />
         <input id="color" type="color" className="w-10 h-10 border rounded cursor-pointer" defaultValue="#3b82f6" />
@@ -189,112 +235,107 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* Tag Filter Bar */}
       <div className="mb-4 flex items-center gap-2 flex-wrap">
         <span className="text-sm font-medium">Filter:</span>
-        {allTags.map(tag => (
+        {allTags.map((tag) => (
           <button
             key={tag}
-            onClick={() => setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
-            className={`px-2 py-1 text-xs rounded border ${selectedTags.includes(tag) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-700 border-gray-300"}`}
+            onClick={() =>
+              setSelectedTags((prev) =>
+                prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+              )
+            }
+            className={`px-2 py-1 text-xs rounded border ${
+              selectedTags.includes(tag)
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "bg-white text-gray-700 border-gray-300"
+            }`}
           >
             {tag}
           </button>
         ))}
         {selectedTags.length > 0 && (
-          <button onClick={() => setSelectedTags([])} className="px-2 py-1 text-xs rounded border bg-gray-200 text-gray-700">
+          <button
+            onClick={() => setSelectedTags([])}
+            className="px-2 py-1 text-xs rounded border bg-gray-200 text-gray-700"
+          >
             Clear
           </button>
         )}
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {columns.map(col => (
+      {/* Kanban Grid */}
+      <div className="flex gap-4">
+        {columns.map((col) => (
           <div
             key={col}
-            className="w-72 bg-gray-100 p-2 rounded flex-shrink-0 min-h-[500px]"
+            className="w-72 bg-gray-100 p-2 rounded"
             onDrop={(e) => handleDrop(e, col)}
             onDragOver={handleDragOver}
           >
-            <h2 className="font-bold capitalize mb-2 text-gray-700">{col}</h2>
+            <h2 className="font-bold capitalize mb-2">{col}</h2>
             {visibleCards
-              .filter(c => c.status === col)
+              .filter((c) => c.status === col)
               .map((c) => (
                 <div
                   key={c.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, c.id)}
-                  className="bg-white p-3 mb-3 rounded shadow cursor-move relative"
+                  className="bg-white p-4 mb-3 rounded shadow cursor-move relative"
                   style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
                 >
+                  {/* Top row: Due date badge and date picker */}
                   <div className="flex items-center justify-between mb-2">
                     <DueBadge date={c.due_date} />
                     <input
                       type="date"
                       value={c.due_date ? c.due_date.substring(0, 10) : ""}
                       onChange={(e) => changeDueDate(c.id, e.target.value)}
-                      className="text-xs rounded border px-1 py-0.5"
+                      className="text-xs border rounded px-1"
                     />
                   </div>
 
+                  {/* Title and email */}
                   <div className="mb-2">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-gray-800">{c.title}</p>
-                      {c.is_recurring && <span className="text-purple-600">↻</span>}
-                    </div>
+                    <p className="font-semibold text-gray-800">{c.title}</p>
                     <p className="text-sm text-gray-500">{c.client_email}</p>
                   </div>
 
-                  {/* Files display */}
-                  {(() => {
-                    const files = JSON.parse(c.files || "[]");
-                    if (files.length === 0) return null;
-                    return (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {files.map((f: any) => (
-                          <div key={f.url} className="flex items-center gap-1 bg-gray-100 rounded px-2 py-1 text-xs">
-                            <a href={f.url} target="_blank" className="text-blue-600 hover:underline truncate max-w-[100px]">{f.name}</a>
-                            <button onClick={() => removeFile(c.id, f.url)} className="text-red-500 ml-1">×</button>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                  {/* Bottom row: Tags and actions */}
+                  <div className="flex items-center justify-between">
                     <div className="flex gap-1 flex-wrap">
-                      {allTags.map(tag => (
-                        <button
-                          key={tag}
-                          onClick={() => {
-                            const current = (c.tags || "").split(",").filter(Boolean);
-                            const next = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
-                            changeTags(c.id, next);
-                          }}
-                          className={`text-[10px] px-1.5 py-0.5 rounded border ${(c.tags || "").split(",").includes(tag) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300"}`}
-                        >
-                          {tag}
-                        </button>
-                      ))}
+                      {allTags.map((tag) => {
+                        const isActive = (c.tags || "").split(",").includes(tag);
+                        return (
+                          <button
+                            key={tag}
+                            onClick={() => {
+                              const current = (c.tags || "").split(",").filter(Boolean);
+                              const next = current.includes(tag)
+                                ? current.filter((t) => t !== tag)
+                                : [...current, tag];
+                              changeTags(c.id, next);
+                            }}
+                            className={`text-xs px-2 py-1 rounded border ${
+                              isActive
+                                ? "bg-indigo-600 text-white border-indigo-600"
+                                : "bg-white text-gray-700 border-gray-300"
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        );
+                      })}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <label 
-                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded border cursor-pointer ${uploading === c.id ? "bg-gray-300 text-gray-500" : "bg-gray-100 hover:bg-gray-200"}`}
-                      >
-                        <span>{uploading === c.id ? "..." : "Attach"}</span>
+                    <div className="flex gap-1 items-center">
+                      <label className="text-xs px-2 py-1 rounded border bg-gray-200 text-gray-700 cursor-pointer">
+                        File
                         <input
-                          ref={(el) => { fileInputRefs.current[c.id] = el; }}
                           type="file"
                           multiple
-                          disabled={uploading === c.id}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            console.log("File input changed:", e.target.files);
-                            if (e.target.files && e.target.files.length > 0) {
-                              uploadFiles(c.id, e.target.files);
-                            }
-                          }}
+                          onChange={(e) => e.target.files && uploadFiles(c.id, e.target.files)}
                           className="hidden"
                         />
                       </label>
@@ -302,55 +343,13 @@ export default function Dashboard() {
                         type="color"
                         value={c.color || "#3b82f6"}
                         onChange={(e) => changeColor(c.id, e.target.value)}
-                        className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent"
+                        className="w-8 h-8 p-0 border rounded cursor-pointer"
+                        title="Change color"
                       />
                     </div>
                   </div>
 
-                  {/* Inline Comment Section - No focus issues */}
-                  <div className="mt-3 border-t pt-2">
-                    <div className="space-y-1 mb-2 max-h-24 overflow-y-auto" id={`comments-${c.id}`}>
-                      {/* Comments load here */}
-                    </div>
-                    <div className="flex gap-1">
-                      <input 
-                        id={`comment-input-${c.id}`}
-                        type="text" 
-                        placeholder="Add comment..."
-                        className="flex-1 text-xs border rounded px-2 py-1"
-                        onKeyPress={(e) => {
-                          if (e.key === "Enter") {
-                            const input = document.getElementById(`comment-input-${c.id}`) as HTMLInputElement;
-                            if (input.value.trim()) {
-                              fetch(`/api/cards/${c.id}/comments`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ text: input.value, author: "User" })
-                              }).then(() => {
-                                input.value = "";
-                                // Optionally reload comments here
-                              });
-                            }
-                          }
-                        }}
-                      />
-                      <button 
-                        onClick={() => {
-                          const input = document.getElementById(`comment-input-${c.id}`) as HTMLInputElement;
-                          if (input.value.trim()) {
-                            fetch(`/api/cards/${c.id}/comments`, {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ text: input.value, author: "User" })
-                            }).then(() => { input.value = ""; });
-                          }
-                        }}
-                        className="text-xs bg-indigo-600 text-white px-2 py-1 rounded"
-                      >
-                        Post
-                      </button>
-                    </div>
-                  </div>
+                  <FileList card={c} />
                 </div>
               ))}
           </div>
