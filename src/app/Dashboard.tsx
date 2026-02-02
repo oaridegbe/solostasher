@@ -28,6 +28,8 @@ export default function Dashboard() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [newComment, setNewComment] = useState("");
+  const [view, setView] = useState<"board" | "calendar">("board");
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
     fetch("/api/cards")
@@ -45,6 +47,28 @@ export default function Dashboard() {
         setCards([]);
       });
   }, []);
+
+  // Calendar helpers
+  function getDaysInMonth(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  }
+
+  function getFirstDayOfMonth(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  }
+
+  function getCardsForDay(day: number) {
+    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return visibleCards.filter(c => c.due_date === dateStr);
+  }
+
+  function prevMonth() {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  }
+
+  function nextMonth() {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  }
 
   // Drag & Drop
   function handleDragStart(e: React.DragEvent<HTMLDivElement>, cardId: string) {
@@ -219,7 +243,6 @@ export default function Dashboard() {
     
     setNewComment("");
     
-    // Refresh modal data
     if (selectedCard) {
       openCardModal(selectedCard);
     }
@@ -271,6 +294,68 @@ export default function Dashboard() {
             </button>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  // Calendar Component
+  function CalendarView() {
+    const daysInMonth = getDaysInMonth(currentMonth);
+    const firstDay = getFirstDayOfMonth(currentMonth);
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const blanks = Array.from({ length: firstDay }, (_, i) => i);
+    
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold">
+            {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+          </h2>
+          <div className="flex gap-2">
+            <button onClick={prevMonth} className="px-3 py-1 border rounded hover:bg-gray-50">←</button>
+            <button onClick={nextMonth} className="px-3 py-1 border rounded hover:bg-gray-50">→</button>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-7 gap-2">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+            <div key={day} className="text-center font-medium text-gray-600 py-2">
+              {day}
+            </div>
+          ))}
+          
+          {blanks.map((_, i) => (
+            <div key={`blank-${i}`} className="h-24 bg-gray-50 rounded" />
+          ))}
+          
+          {days.map(day => {
+            const dayCards = getCardsForDay(day);
+            return (
+              <div 
+                key={day} 
+                className="h-24 border rounded p-2 overflow-y-auto hover:bg-gray-50"
+              >
+                <div className="font-medium text-sm text-gray-700 mb-1">{day}</div>
+                <div className="space-y-1">
+                  {dayCards.map(card => (
+                    <div
+                      key={card.id}
+                      onClick={() => openCardModal(card)}
+                      className="text-xs p-1 rounded cursor-pointer truncate"
+                      style={{ backgroundColor: card.color || "#3b82f6", color: "white" }}
+                    >
+                      {card.title}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   }
@@ -407,7 +492,28 @@ export default function Dashboard() {
 
   return (
     <main className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">SoloStasher Board</h1>
+      {/* Header with View Toggle */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">SoloStasher Board</h1>
+        <div className="flex bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setView("board")}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              view === "board" ? "bg-white shadow text-gray-900" : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Board
+          </button>
+          <button
+            onClick={() => setView("calendar")}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              view === "calendar" ? "bg-white shadow text-gray-900" : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Calendar
+          </button>
+        </div>
+      </div>
 
       {/* New Deal Form */}
       <div className="mb-6 flex flex-wrap items-center gap-2 bg-white p-4 rounded-lg shadow-sm border">
@@ -452,115 +558,120 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Kanban Grid */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {columns.map((col) => (
-          <div
-            key={col}
-            className="w-80 bg-gray-100 p-3 rounded-lg flex-shrink-0 min-h-[500px]"
-            onDrop={(e) => handleDrop(e, col)}
-            onDragOver={handleDragOver}
-          >
-            <h2 className="font-bold capitalize mb-3 text-gray-700 px-1">
-              {col} 
-              <span className="ml-2 text-xs font-normal text-gray-500">
-                ({visibleCards.filter((c) => c.status === col).length})
-              </span>
-            </h2>
-            
-            <div className="space-y-3">
-              {visibleCards
-                .filter((c) => c.status === col)
-                .map((c) => (
-                  <div
-                    key={c.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, c.id)}
-                    onClick={() => openCardModal(c)}
-                    className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 cursor-move hover:shadow-md transition-shadow relative group min-h-[140px] flex flex-col"
-                    style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
-                  >
-                    {/* Header: Due Date Badge and Date Picker */}
-                    <div className="flex items-center justify-between mb-3">
-                      <DueBadge date={c.due_date} />
-                      <input
-                        type="date"
-                        value={c.due_date ? c.due_date.substring(0, 10) : ""}
-                        onChange={(e) => changeDueDate(c.id, e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs border rounded px-1 py-0.5 text-gray-600 cursor-pointer hover:border-gray-400"
-                        title="Set due date"
-                      />
-                    </div>
-
-                    {/* Content */}
-                    <div className="mb-3 flex-grow">
-                      <p className="font-semibold text-gray-800 leading-tight">{c.title}</p>
-                      {c.client_email && (
-                        <p className="text-sm text-gray-500 mt-1">{c.client_email}</p>
-                      )}
-                    </div>
-
-                    {/* Bottom row: Tags (aligned bottom), file + color */}
-                    <div className="flex items-end justify-between mt-auto gap-2">
-                      <div className="flex gap-1 flex-wrap content-end">
-                        {allTags.map((tag) => {
-                          const active = (c.tags || "").split(",").includes(tag);
-                          return (
-                            <button
-                              key={tag}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const current = (c.tags || "").split(",").filter(Boolean);
-                                const next = current.includes(tag)
-                                  ? current.filter((t) => t !== tag)
-                                  : [...current, tag];
-                                changeTags(c.id, next);
-                              }}
-                              className={`text-[10px] px-2 py-1 rounded border transition-colors ${
-                                active
-                                  ? "bg-indigo-600 text-white border-indigo-600"
-                                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                              }`}
-                            >
-                              {tag}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <label 
-                          className="text-xs px-2 py-1 rounded border bg-gray-100 text-gray-700 cursor-pointer hover:bg-gray-200 transition-colors"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          File
-                          <input
-                            type="file"
-                            multiple
-                            onChange={(e) => e.target.files && uploadFiles(c.id, e.target.files)}
-                            className="hidden"
-                          />
-                        </label>
+      {/* Board View */}
+      {view === "board" && (
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {columns.map((col) => (
+            <div
+              key={col}
+              className="w-80 bg-gray-100 p-3 rounded-lg flex-shrink-0 min-h-[500px]"
+              onDrop={(e) => handleDrop(e, col)}
+              onDragOver={handleDragOver}
+            >
+              <h2 className="font-bold capitalize mb-3 text-gray-700 px-1">
+                {col} 
+                <span className="ml-2 text-xs font-normal text-gray-500">
+                  ({visibleCards.filter((c) => c.status === col).length})
+                </span>
+              </h2>
+              
+              <div className="space-y-3">
+                {visibleCards
+                  .filter((c) => c.status === col)
+                  .map((c) => (
+                    <div
+                      key={c.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, c.id)}
+                      onClick={() => openCardModal(c)}
+                      className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 cursor-move hover:shadow-md transition-shadow relative group min-h-[140px] flex flex-col"
+                      style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
+                    >
+                      {/* Header: Due Date Badge and Date Picker */}
+                      <div className="flex items-center justify-between mb-3">
+                        <DueBadge date={c.due_date} />
                         <input
-                          type="color"
-                          value={c.color || "#3b82f6"}
-                          onChange={(e) => changeColor(c.id, e.target.value)}
+                          type="date"
+                          value={c.due_date ? c.due_date.substring(0, 10) : ""}
+                          onChange={(e) => changeDueDate(c.id, e.target.value)}
                           onClick={(e) => e.stopPropagation()}
-                          className="w-8 h-8 p-0 border-0 rounded cursor-pointer overflow-hidden"
-                          title="Change color"
+                          className="text-xs border rounded px-1 py-0.5 text-gray-600 cursor-pointer hover:border-gray-400"
+                          title="Set due date"
                         />
                       </div>
-                    </div>
 
-                    {/* File Attachments */}
-                    <FileList card={c} />
-                  </div>
-                ))}
+                      {/* Content */}
+                      <div className="mb-3 flex-grow">
+                        <p className="font-semibold text-gray-800 leading-tight">{c.title}</p>
+                        {c.client_email && (
+                          <p className="text-sm text-gray-500 mt-1">{c.client_email}</p>
+                        )}
+                      </div>
+
+                      {/* Bottom row: Tags (aligned bottom), file + color */}
+                      <div className="flex items-end justify-between mt-auto gap-2">
+                        <div className="flex gap-1 flex-wrap content-end">
+                          {allTags.map((tag) => {
+                            const active = (c.tags || "").split(",").includes(tag);
+                            return (
+                              <button
+                                key={tag}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const current = (c.tags || "").split(",").filter(Boolean);
+                                  const next = current.includes(tag)
+                                    ? current.filter((t) => t !== tag)
+                                    : [...current, tag];
+                                  changeTags(c.id, next);
+                                }}
+                                className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                                  active
+                                    ? "bg-indigo-600 text-white border-indigo-600"
+                                    : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                                }`}
+                              >
+                                {tag}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <label 
+                            className="text-xs px-2 py-1 rounded border bg-gray-100 text-gray-700 cursor-pointer hover:bg-gray-200 transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            File
+                            <input
+                              type="file"
+                              multiple
+                              onChange={(e) => e.target.files && uploadFiles(c.id, e.target.files)}
+                              className="hidden"
+                            />
+                          </label>
+                          <input
+                            type="color"
+                            value={c.color || "#3b82f6"}
+                            onChange={(e) => changeColor(c.id, e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-8 h-8 p-0 border-0 rounded cursor-pointer overflow-hidden"
+                            title="Change color"
+                          />
+                        </div>
+                      </div>
+
+                      {/* File Attachments */}
+                      <FileList card={c} />
+                    </div>
+                  ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* Calendar View */}
+      {view === "calendar" && <CalendarView />}
 
       {/* Modal */}
       {selectedCard && <CardModal card={selectedCard} />}
