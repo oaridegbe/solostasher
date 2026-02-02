@@ -1,49 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { NextResponse } from "next/server"
+import { PrismaClient } from "@prisma/client"
 
-export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+const prisma = new PrismaClient()
 
+async function sendEmail(to: string, subject: string) {
+  // Your email sending logic here
+  console.log(`Sending email to ${to}: ${subject}`)
+}
+
+export async function GET() {
   try {
     const notifications = await prisma.notificationQueue.findMany({
       where: {
-        status: 'pending',
+        status: "pending",
         dueDate: { lte: new Date() }
       },
-      include: { card: true }
-    });
+      include: {
+        card: true
+      }
+    })
 
     for (const notification of notifications) {
-      if (notification.email) {
-        await sendEmail(notification.email, notification.card.title);
+      if (notification.card?.client_email) {
+        await sendEmail(notification.card.client_email, notification.card.title)
+        
+        await prisma.notificationQueue.update({
+          where: { id: notification.id },
+          data: { 
+            status: "sent",
+            sentAt: new Date()
+          }
+        })
       }
-      
-      if (notification.slackWebhook) {
-        await fetch(notification.slackWebhook, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: `🔔 Reminder: "${notification.card.title}" is due!`
-          })
-        });
-      }
-      
-      await prisma.notificationQueue.update({
-        where: { id: notification.id },
-        data: { status: 'sent' }
-      });
     }
 
-    return NextResponse.json({ processed: notifications.length });
+    return NextResponse.json({ processed: notifications.length })
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: 'Cron failed' }, { status: 500 });
+    console.error("Error processing notifications:", error)
+    return NextResponse.json({ error: "Failed to process notifications" }, { status: 500 })
   }
-}
-
-async function sendEmail(to: string, cardTitle: string) {
-  console.log(`Sending email to ${to} for card: ${cardTitle}`);
 }

@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  engineType = "binary"
 }
 
 datasource db {
@@ -9,14 +8,58 @@ datasource db {
 }
 
 model Card {
-  id           String   @id @default(uuid())
-  title        String
-  client_email String?
-  status       String   @default("inquiry") // inquiry, quoted, completed, followup
-  color        String   @default("#3b82f6")
-  tags         String   @default("")         // comma-separated: "Hot,Recurring"
-  due_date     String?  // ISO date string
-  files        String   @default("[]")       // JSON array of {url, name}
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(uuid())
+  title             String
+  client_email      String?
+  status            String   @default("inquiry")
+  color             String   @default("#3b82f6")
+  tags              String   @default("")
+  due_date          String?
+  files             String   @default("[]")
+  isRecurring       Boolean  @default(false)
+  recurrencePattern String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  activities        ActivityLog[]
+  comments          Comment[]
+  notifications     NotificationQueue[]
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  cardId    String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+  
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  @@index([cardId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  cardId    String
+  text      String
+  author    String   @default("User")
+  createdAt DateTime @default(now())
+  
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  @@index([cardId])
+}
+
+model NotificationQueue {
+  id        String   @id @default(uuid())
+  cardId    String
+  type      String
+  status    String   @default("pending")
+  dueDate   DateTime
+  createdAt DateTime @default(now())
+  sentAt    DateTime?
+  
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  @@index([cardId])
+  @@index([status, dueDate])
 }

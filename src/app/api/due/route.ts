@@ -6,10 +6,10 @@ export async function POST(req: NextRequest) {
     const { cardId, due_date } = await req.json();
     await prisma.card.update({
       where: { id: cardId },
-      data: { dueDate: due_date ? new Date(due_date) : null }
+      data: { due_date: due_date || null }  // Remove new Date()
     });
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to update due date' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update due_date' }, { status: 500 });
   }
 }
