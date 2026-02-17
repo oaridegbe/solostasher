@@ -4,7 +4,6 @@ import { Resend } from "resend"
 
 const prisma = new PrismaClient()
 
-// Lazy init Resend to avoid build-time errors
 const getResend = () => {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
@@ -14,38 +13,32 @@ const getResend = () => {
 }
 
 export async function GET() {
-  // Check for API key at runtime
   if (!process.env.RESEND_API_KEY) {
     return NextResponse.json({ 
-      error: "Email service not configured. Add RESEND_API_KEY to .env.local" 
+      error: "Email service not configured" 
     }, { status: 503 })
   }
 
   try {
-    console.log("=== DEBUG: Starting notification processing ===")
-    console.log("Current time:", new Date().toISOString())
-    console.log("Querying for notifications with status: pending, dueDate <= now")
+    const now = new Date().toISOString()
     
-    const notifications = await prisma.notificationQueue.findMany({
-      where: {
-        status: "pending",
-        dueDate: { lte: new Date() }
-      },
-      include: {
-        card: true
-      }
-    })
+    // Use raw query that we know works
+    const notifications: any = await prisma.$queryRaw`
+      SELECT n.*, c.id as "card.id", c.title as "card.title", 
+             c."client_email" as "card.client_email", c.status as "card.status",
+             c.color as "card.color", c.tags as "card.tags"
+      FROM "NotificationQueue" n
+      LEFT JOIN "Card" c ON n."cardId" = c.id
+      WHERE n.status = 'pending' 
+      AND n."dueDate" <= ${now}
+    `
 
-    console.log("Found notifications:", notifications.length)
-    console.log("Notifications data:", JSON.stringify(notifications, null, 2))
-    
     let sentCount = 0
 
     for (const notification of notifications) {
-      console.log("Processing notification:", notification.id)
-      console.log("Card email:", notification.card?.client_email)
+      const cardEmail = notification["card.client_email"]
       
-      if (!notification.card?.client_email) {
+      if (!cardEmail) {
         console.log("Skipping - no client email")
         continue
       }
@@ -53,53 +46,45 @@ export async function GET() {
       try {
         const resend = getResend()
         
-        console.log("Sending email to:", notification.card.client_email)
-        
         const result = await resend.emails.send({
           from: process.env.FROM_EMAIL || "onboarding@resend.dev",
-          to: notification.card.client_email,
-          subject: `Reminder: ${notification.card.title} is due`,
+          to: cardEmail,
+          subject: `Reminder: ${notification["card.title"]} is due`,
           html: `
             <h2>Deal Reminder</h2>
-            <p><strong>${notification.card.title}</strong> is due.</p>
-            <p>Status: ${notification.card.status}</p>
+            <p><strong>${notification["card.title"]}</strong> is due.</p>
+            <p>Status: ${notification["card.status"]}</p>
             <br>
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard" 
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://solostasher.com"}/dashboard" 
                style="background:#3b82f6;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">
               View Deal
             </a>
           `
         })
 
-        console.log("Email sent successfully:", result)
+        // Mark as sent
+        await prisma.$executeRaw`
+          UPDATE "NotificationQueue" 
+          SET status = 'sent', "sentAt" = NOW() 
+          WHERE id = ${notification.id}
+        `
 
-        await prisma.notificationQueue.update({
-          where: { id: notification.id },
-          data: { 
-            status: "sent",
-            sentAt: new Date()
-          }
-        })
-
-        await prisma.activityLog.create({
-          data: {
-            cardId: notification.cardId,
-            action: "notification_sent",
-            details: `Email sent to ${notification.card.client_email}`
-          }
-        })
+        // Log activity
+        await prisma.$executeRaw`
+          INSERT INTO "ActivityLog" ("cardId", action, details, "createdAt")
+          VALUES (${notification.cardId}, 'notification_sent', ${`Email sent to ${cardEmail}`}, NOW())
+        `
 
         sentCount++
       } catch (emailError) {
         console.error("Failed to send email:", emailError)
-        await prisma.notificationQueue.update({
-          where: { id: notification.id },
-          data: { status: "failed" }
-        })
+        await prisma.$executeRaw`
+          UPDATE "NotificationQueue" 
+          SET status = 'failed' 
+          WHERE id = ${notification.id}
+        `
       }
     }
-
-    console.log("=== DEBUG: Finished processing. Sent:", sentCount, "===")
 
     return NextResponse.json({ 
       processed: notifications.length, 
