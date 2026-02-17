@@ -22,7 +22,9 @@ export async function GET() {
   }
 
   try {
-    const resend = getResend()
+    console.log("=== DEBUG: Starting notification processing ===")
+    console.log("Current time:", new Date().toISOString())
+    console.log("Querying for notifications with status: pending, dueDate <= now")
     
     const notifications = await prisma.notificationQueue.findMany({
       where: {
@@ -34,13 +36,26 @@ export async function GET() {
       }
     })
 
+    console.log("Found notifications:", notifications.length)
+    console.log("Notifications data:", JSON.stringify(notifications, null, 2))
+    
     let sentCount = 0
 
     for (const notification of notifications) {
-      if (!notification.card?.client_email) continue
+      console.log("Processing notification:", notification.id)
+      console.log("Card email:", notification.card?.client_email)
+      
+      if (!notification.card?.client_email) {
+        console.log("Skipping - no client email")
+        continue
+      }
 
       try {
-        await resend.emails.send({
+        const resend = getResend()
+        
+        console.log("Sending email to:", notification.card.client_email)
+        
+        const result = await resend.emails.send({
           from: process.env.FROM_EMAIL || "onboarding@resend.dev",
           to: notification.card.client_email,
           subject: `Reminder: ${notification.card.title} is due`,
@@ -55,6 +70,8 @@ export async function GET() {
             </a>
           `
         })
+
+        console.log("Email sent successfully:", result)
 
         await prisma.notificationQueue.update({
           where: { id: notification.id },
@@ -81,6 +98,8 @@ export async function GET() {
         })
       }
     }
+
+    console.log("=== DEBUG: Finished processing. Sent:", sentCount, "===")
 
     return NextResponse.json({ 
       processed: notifications.length, 
