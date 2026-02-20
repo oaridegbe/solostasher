@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 
 const columns = ["inquiry", "quoted", "completed", "followup"];
 const allTags = ["Hot", "Recurring", "Upsell"];
+const recurrenceOptions = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'yearly', label: 'Yearly' }
+];
 
 interface Card {
   id: string;
@@ -14,6 +20,8 @@ interface Card {
   tags?: string;
   due_date?: string;
   files?: string;
+  isRecurring?: boolean;
+  recurrencePattern?: string;
   activities?: any[];
   comments?: any[];
 }
@@ -140,6 +148,19 @@ export default function Dashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cardId, due_date: newDate }),
     }).catch((err) => console.error("Due-date update failed", err));
+  }
+
+  // Toggle recurring
+  async function toggleRecurring(cardId: string, isRecurring: boolean, pattern: string = 'monthly') {
+    setCards(prev =>
+      prev.map(c => c.id === cardId ? { ...c, isRecurring, recurrencePattern: pattern } : c)
+    );
+
+    await fetch('/api/recurring', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId, isRecurring, pattern })
+    }).catch(err => console.error('Failed to update recurring:', err));
   }
 
   // File uploads
@@ -401,7 +422,7 @@ export default function Dashboard() {
             {/* Tags */}
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-2">Tags</label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {allTags.map(tag => {
                   const isActive = (card.tags || "").split(",").includes(tag);
                   return (
@@ -420,6 +441,47 @@ export default function Dashboard() {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Recurring Toggle */}
+            <div className="border-t pt-4">
+              <label className="text-sm font-medium text-gray-700 block mb-2">Recurrence</label>
+              <div className="flex items-center gap-3 flex-wrap">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={card.isRecurring || false}
+                    onChange={(e) => {
+                      const newValue = e.target.checked;
+                      toggleRecurring(card.id, newValue, card.recurrencePattern || 'monthly');
+                      setSelectedCard({ ...card, isRecurring: newValue, recurrencePattern: card.recurrencePattern || 'monthly' });
+                    }}
+                    className="w-4 h-4 text-indigo-600 rounded"
+                  />
+                  <span className="ml-2 text-sm">Auto-reset when completed</span>
+                </label>
+                
+                {card.isRecurring && (
+                  <select
+                    value={card.recurrencePattern || 'monthly'}
+                    onChange={(e) => {
+                      const newPattern = e.target.value;
+                      toggleRecurring(card.id, true, newPattern);
+                      setSelectedCard({ ...card, recurrencePattern: newPattern });
+                    }}
+                    className="text-sm border rounded px-2 py-1"
+                  >
+                    {recurrenceOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              {card.isRecurring && (
+                <p className="text-xs text-gray-500 mt-2">
+                  When moved to &quot;completed&quot;, a new deal will be created with the next due date.
+                </p>
+              )}
             </div>
 
             {/* Files */}
@@ -605,6 +667,11 @@ export default function Dashboard() {
                         <p className="font-semibold text-gray-800 leading-tight">{c.title}</p>
                         {c.client_email && (
                           <p className="text-sm text-gray-500 mt-1">{c.client_email}</p>
+                        )}
+                        {c.isRecurring && (
+                          <span className="text-xs text-indigo-600 font-medium mt-1 inline-block">
+                            ↻ Recurring
+                          </span>
                         )}
                       </div>
 

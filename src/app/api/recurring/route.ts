@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export async function POST(req: NextRequest) {
   try {
-    const { cardId, is_recurring, recurrence_pattern } = await req.json();
-    
+    const { cardId, isRecurring, pattern } = await req.json();
+
     await prisma.card.update({
       where: { id: cardId },
       data: {
-        isRecurring: is_recurring,
-        recurrencePattern: recurrence_pattern
+        isRecurring,
+        recurrencePattern: isRecurring ? pattern : null
       }
     });
-    
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to update recurring settings' }, { status: 500 });
+    console.error('Error updating recurring:', error);
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
 }
