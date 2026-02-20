@@ -34,6 +34,7 @@ interface FileAttachment {
 export default function Dashboard() {
   const [cards, setCards] = useState<Card[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [newComment, setNewComment] = useState("");
   const [view, setView] = useState<"board" | "calendar">("board");
@@ -269,10 +270,16 @@ export default function Dashboard() {
     }
   }
 
-  // Filter
-  const visibleCards = selectedTags.length
-    ? cards.filter((c) => selectedTags.some((t) => (c.tags || "").split(",").includes(t)))
-    : cards;
+  // Filter and Search
+  const filteredCards = cards.filter((c) => {
+    const matchesTags = selectedTags.length === 0 || selectedTags.some((t) => (c.tags || "").split(",").includes(t));
+    const matchesSearch = searchQuery === "" || 
+      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.client_email || "").toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesTags && matchesSearch;
+  });
+
+  const visibleCards = filteredCards;
 
   // Due badge component
   function DueBadge({ date }: { date?: string }) {
@@ -577,6 +584,35 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search deals by title or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-4 py-3 pl-10 border rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+          <svg className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="text-sm text-gray-500 mt-2">
+            Found {visibleCards.length} {visibleCards.length === 1 ? 'deal' : 'deals'} matching &quot;{searchQuery}&quot;
+          </p>
+        )}
+      </div>
+
       {/* New Deal Form */}
       <div className="mb-6 flex flex-wrap items-center gap-2 bg-white p-4 rounded-lg shadow-sm border">
         <input id="title" placeholder="Deal title" className="px-3 py-2 border rounded flex-1 min-w-[200px]" />
@@ -610,12 +646,15 @@ export default function Dashboard() {
             {tag}
           </button>
         ))}
-        {selectedTags.length > 0 && (
+        {(selectedTags.length > 0 || searchQuery) && (
           <button
-            onClick={() => setSelectedTags([])}
+            onClick={() => {
+              setSelectedTags([]);
+              setSearchQuery("");
+            }}
             className="px-3 py-1 text-xs rounded-full border bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
           >
-            Clear filters
+            Clear all
           </button>
         )}
       </div>
