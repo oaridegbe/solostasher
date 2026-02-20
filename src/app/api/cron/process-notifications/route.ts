@@ -10,7 +10,6 @@ const getResend = () => {
   return new Resend(apiKey)
 }
 
-// Send Slack notification
 async function sendSlackNotification(card: any) {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL
   if (!webhookUrl) {
@@ -19,13 +18,13 @@ async function sendSlackNotification(card: any) {
   }
 
   const message = {
-    text: `🔔 Deal Reminder: *${card.title}* is due!`,
+    text: `Deal Reminder: *${card.title}* is due!`,
     blocks: [
       {
         type: "header",
         text: {
           type: "plain_text",
-          text: "🔔 Deal Due Today",
+          text: "Deal Due Today",
           emoji: true
         }
       },
@@ -49,58 +48,31 @@ async function sendSlackNotification(card: any) {
             text: `*Tags:*\n${card.tags || "None"}`
           }
         ]
-      },
-      {
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: {
-              type: "plain_text",
-              text: "View in Dashboard",
-              emoji: true
-            },
-            url: `${process.env.NEXT_PUBLIC_APP_URL || "https://solostasher.com"}/dashboard`,
-            style: "primary"
-          }
-        ]
       }
     ]
   }
 
   try {
-    const response = await fetch(webhookUrl, {
+    await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(message)
     })
-    
-    if (!response.ok) {
-      throw new Error(`Slack error: ${response.status}`)
-    }
-    
-    console.log("Slack notification sent")
+    console.log("Slack sent")
   } catch (error) {
-    console.error("Failed to send Slack:", error)
+    console.error("Slack failed:", error)
   }
 }
 
 export async function GET() {
-  if (!process.env.RESEND_API_KEY) {
-    return NextResponse.json({ error: "RESEND_API_KEY missing" }, { status: 503 })
-  }
-
   try {
-    // Use NOW() directly in SQL
     const notifications = await prisma.$queryRawUnsafe(`
-      SELECT n.*, c.title, c."client_email", c.status, c.color, c.tags
+      SELECT n.*, c.title, c."client_email", c.status, c.tags
       FROM "NotificationQueue" n
       JOIN "Card" c ON n."cardId" = c.id
-      WHERE n.status = 'pending' 
+      WHERE n.status = 'pending'
       AND n."dueDate" <= NOW()
     `)
-
-    console.log("Found notifications:", (notifications as any[]).length)
 
     let sentCount = 0
 
@@ -108,60 +80,33 @@ export async function GET() {
       if (!row.client_email) continue
 
       try {
-        // Send Email
+        // Email
         const resend = getResend()
         await resend.emails.send({
           from: process.env.FROM_EMAIL || "onboarding@resend.dev",
           to: row.client_email,
           subject: `Reminder: ${row.title} is due`,
-          html: `
-            <h2>Deal Reminder</h2>
-            <p><strong>${row.title}</strong> is due.</p>
-            <p>Status: ${row.status}</p>
-            <br>
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://solostasher.com"}/dashboard" 
-               style="background:#3b82f6;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">
-              View Deal
-            </a>
-          `
+          html: `<h2>${row.title}</h2><p>Status: ${row.status}</p>`
         })
 
-        // Send Slack
+        // Slack
         await sendSlackNotification(row)
 
-        // Mark as sent
+        // Update status
         await prisma.$executeRawUnsafe(`
           UPDATE "NotificationQueue" 
           SET status = 'sent', "sentAt" = NOW() 
           WHERE id = '${row.id}'
         `)
 
-        // Log activity
-        await prisma.$executeRawUnsafe(`
-          INSERT INTO "ActivityLog" ("cardId", action, details, "createdAt")
-          VALUES ('${row.cardId}', 'notification_sent', 'Email and Slack sent to ${row.client_email}', NOW())
-        `)
-
         sentCount++
       } catch (err) {
-        console.error("Notification error:", err)
-        await prisma.$executeRawUnsafe(`
-          UPDATE "NotificationQueue" 
-          SET status = 'failed' 
-          WHERE id = '${row.id}'
-        `)
+        console.error("Error:", err)
       }
     }
 
-    return NextResponse.json({ 
-      processed: (notifications as any[]).length, 
-      sent: sentCount 
-    })
+    return NextResponse.json({ processed: (notifications as any[]).length, sent: sentCount })
   } catch (error: any) {
-    console.error("Route error:", error)
-    return NextResponse.json({ 
-      error: "Failed to process notifications", 
-      details: error.message 
-    }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
