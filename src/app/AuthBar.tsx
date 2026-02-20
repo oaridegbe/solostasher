@@ -1,20 +1,31 @@
-"use client";
-
-import { useSession, signIn, signOut } from "next-auth/react";
+'use client';
 
 export default function AuthBar() {
-  const { data: session, status } = useSession();
+  const handleSignIn = () => {
+    window.location.href = '/login';
+  };
 
-  if (status === "loading") return <p>Loading…</p>;
+  const handleSignOut = () => {
+    window.location.href = '/';
+  };
 
-  if (session)
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-        <span>Signed in as <strong>{session.user?.email || session.user?.name || "Unknown"}</strong></span>
-        <button onClick={() => signOut()}>Sign out</button>
-      </div>
-    );
+  // Mock session - always "logged in" for now
+  const session = { user: { name: 'User', email: 'user@example.com' } };
 
-  return <button onClick={() => signIn("google")}>Sign in with Google</button>;
+  return (
+    <div className="flex items-center gap-4">
+      {session ? (
+        <>
+          <span>{session.user.name}</span>
+          <button onClick={handleSignOut} className="px-4 py-2 bg-gray-200 rounded">
+            Sign Out
+          </button>
+        </>
+      ) : (
+        <button onClick={handleSignIn} className="px-4 py-2 bg-blue-600 text-white rounded">
+          Sign In
+        </button>
+      )}
+    </div>
+  );
 }
-
