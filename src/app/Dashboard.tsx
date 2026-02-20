@@ -561,26 +561,41 @@ export default function Dashboard() {
 
   return (
     <main className="p-6 max-w-7xl mx-auto">
-      {/* Header with View Toggle */}
-      <div className="flex justify-between items-center mb-6">
+      {/* Header with View Toggle and Export */}
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">SoloStasher Board</h1>
-        <div className="flex bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => setView("board")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              view === "board" ? "bg-white shadow text-gray-900" : "text-gray-600 hover:text-gray-900"
-            }`}
+        <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setView("board")}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                view === "board" ? "bg-white shadow text-gray-900" : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Board
+            </button>
+            <button
+              onClick={() => setView("calendar")}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                view === "calendar" ? "bg-white shadow text-gray-900" : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Calendar
+            </button>
+          </div>
+          
+          {/* Export CSV Button */}
+          <a
+            href="/api/export"
+            download
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm font-medium"
           >
-            Board
-          </button>
-          <button
-            onClick={() => setView("calendar")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              view === "calendar" ? "bg-white shadow text-gray-900" : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Calendar
-          </button>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export CSV
+          </a>
         </div>
       </div>
 
