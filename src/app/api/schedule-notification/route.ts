@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/db"
+import { prisma } from "@/lib/prisma"
 
 export async function POST(req: NextRequest) {
   try {
     const { cardId, dueDate, email } = await req.json()
+
+    // Calculate when to send (on the due date, or adjust as needed)
+    const scheduledAt = new Date(dueDate)
 
     // Find existing pending notification for this card
     const existing = await prisma.notificationQueue.findFirst({
@@ -19,6 +22,7 @@ export async function POST(req: NextRequest) {
         where: { id: existing.id },
         data: {
           dueDate: new Date(dueDate),
+          scheduledAt: scheduledAt,
           type: email ? "email" : "notification"
         }
       })
@@ -28,6 +32,7 @@ export async function POST(req: NextRequest) {
         data: {
           cardId: cardId,
           dueDate: new Date(dueDate),
+          scheduledAt: scheduledAt,
           type: email ? "email" : "notification",
           status: "pending"
         }
