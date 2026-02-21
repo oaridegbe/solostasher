@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // or "mysql", "sqlite", "mongodb"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -25,6 +25,7 @@ model Card {
   position    Int
   priority    String     @default("medium")
   targetDate  DateTime?
+  color       String?    @default("#3b82f6") // Color picker field
   
   boardId     String
   board       Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -101,12 +102,4 @@ model Label {
 
 model Comment {
   id        String   @id @default(cuid())
-  content   String   @db.Text
-  authorId  String
-  cardId    String
-  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([cardId])
-}
+  content  
