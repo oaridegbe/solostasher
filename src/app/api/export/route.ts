@@ -1,26 +1,30 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export async function GET() {
   try {
     const cards = await prisma.card.findMany({
+      include: {
+        cardTags: {
+          include: {
+            tag: true
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
 
     // CSV Header
-    const headers = ['Title', 'Client Email', 'Status', 'Due Date', 'Tags', 'Recurring', 'Pattern', 'Created At', 'Color'];
+    const headers = ['Title', 'Client Email', 'Status', 'Due Date', 'Tags', 'Priority', 'Created At', 'Color'];
     
     // CSV Rows
     const rows = cards.map(card => [
       `"${card.title.replace(/"/g, '""')}"`, // Escape quotes
-      `"${card.client_email || ''}"`,
+      `"${card.clientEmail || ''}"`,
       card.status,
       card.dueDate || '',
-      `"${card.tags || ''}"`,
-      card.isRecurring ? 'Yes' : 'No',
-      card.recurrencePattern || '',
+      `"${card.cardTags?.map(ct => ct.tag.name).join(', ') || ''}"`,
+      card.priority,
       new Date(card.createdAt).toLocaleDateString(),
       card.color || '#3b82f6'
     ]);
