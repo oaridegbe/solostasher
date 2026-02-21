@@ -48,7 +48,7 @@ export default function BoardsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newBoardTitle,
-          userId: 'mock-user-id' // Replace with actual auth
+          userId: 'mock-user-id'
         })
       });
 
@@ -97,7 +97,6 @@ export default function BoardsPage() {
           </div>
         </div>
 
-        {/* Create Board Form */}
         <form onSubmit={createBoard} className="mb-8">
           <div className="flex gap-4">
             <input
@@ -117,7 +116,6 @@ export default function BoardsPage() {
           </div>
         </form>
 
-        {/* Boards Grid */}
         {boards.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
             <p className="text-gray-500 mb-4">No boards yet. Create your first board above!</p>
