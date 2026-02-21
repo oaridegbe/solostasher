@@ -10,19 +10,21 @@ datasource db {
 model Card {
   id                String              @id @default(cuid())
   title             String
-  client_email      String?
+  clientEmail       String?             @map("client_email")
   status            String              @default("inquiry")
   color             String              @default("#3b82f6")
   tags              String              @default("")
-  due_date          String?
+  dueDate           String?             @map("due_date")
   files             String              @default("[]")
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   isRecurring       Boolean             @default(false)
   recurrencePattern String?
-  ActivityLog       ActivityLog[]
+  activityLog       ActivityLog[]
   comments          Comment[]
   notifications     NotificationQueue[]
+
+  @@map("Card")
 }
 
 model Comment {
@@ -34,6 +36,7 @@ model Comment {
   card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId])
+  @@map("Comment")
 }
 
 model NotificationQueue {
@@ -48,6 +51,7 @@ model NotificationQueue {
 
   @@index([cardId])
   @@index([status, dueDate])
+  @@map("NotificationQueue")
 }
 
 model ActivityLog {
@@ -56,7 +60,8 @@ model ActivityLog {
   action    String
   details   String?
   createdAt DateTime @default(now())
-  Card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId])
+  @@map("ActivityLog")
 }
