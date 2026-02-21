@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Force dynamic rendering - prevents static generation error
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const cards = await prisma.card.findMany({
