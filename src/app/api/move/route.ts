@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// Force dynamic rendering - prevents static generation error
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
     const { cardId, newStatus } = await req.json();
     
-    // Update the card status
+    // Get the current card
     const updatedCard = await prisma.card.update({
       where: { id: cardId },
       data: { status: newStatus }
@@ -19,64 +18,49 @@ export async function POST(req: NextRequest) {
       const pattern = updatedCard.recurrencePattern || 'monthly';
       
       // Calculate next due date
-      let nextDueDate: Date | null = null;
+      let nextDueDate: string | null = null;
       if (updatedCard.dueDate) {
         const currentDue = new Date(updatedCard.dueDate);
-        nextDueDate = new Date(currentDue);
+        const nextDate = new Date(currentDue);
         
         switch (pattern) {
           case 'weekly':
-            nextDueDate.setDate(nextDueDate.getDate() + 7);
+            nextDate.setDate(nextDate.getDate() + 7);
             break;
           case 'monthly':
-            nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+            nextDate.setMonth(nextDate.getMonth() + 1);
             break;
           case 'quarterly':
-            nextDueDate.setMonth(nextDueDate.getMonth() + 3);
+            nextDate.setMonth(nextDate.getMonth() + 3);
             break;
           case 'yearly':
-            nextDueDate.setFullYear(nextDueDate.getFullYear() + 1);
+            nextDate.setFullYear(nextDate.getFullYear() + 1);
             break;
           default:
-            nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+            nextDate.setMonth(nextDate.getMonth() + 1);
         }
+        
+        nextDueDate = nextDate.toISOString();
       }
 
       // Create new recurring deal
-      const newCard = await prisma.card.create({
-        data: {
-          title: updatedCard.title,
-          clientEmail: updatedCard.clientEmail,
-          color: updatedCard.color,
-          boardId: updatedCard.boardId,
-          columnId: updatedCard.columnId,
-          position: updatedCard.position,
-          isRecurring: true,
-          recurrencePattern: pattern,
-          dueDate: nextDueDate,
-          status: 'inquiry',
-          priority: updatedCard.priority
-        }
+      const createData: any = {
+        title: updatedCard.title,
+        clientEmail: updatedCard.clientEmail,
+        color: updatedCard.color,
+        status: 'inquiry',
+        priority: 'medium',
+        isRecurring: true,
+        recurrencePattern: pattern,
+        dueDate: nextDueDate,
+        tags: '',
+        files: '[]'
+      };
+
+      await prisma.card.create({
+        data: createData
       });
-
-      // Log the activity (commented out - add ActivityLog model if needed)
-      // await prisma.activityLog.create({
-      //   data: {
-      //     cardId: newCard.id,
-      //     action: 'recurring_created',
-      //     details: `Auto-created from completed deal. Pattern: ${pattern}`
-      //   }
-      // });
     }
-
-    // Log the move activity (commented out - add ActivityLog model if needed)
-    // await prisma.activityLog.create({
-    //   data: {
-    //     cardId: cardId,
-    //     action: 'status_changed',
-    //     details: `Moved to ${newStatus}`
-    //   }
-    // });
 
     return NextResponse.json({ success: true });
   } catch (error) {
