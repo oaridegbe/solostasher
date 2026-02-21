@@ -52,33 +52,36 @@ model CardTag {
 }
 
 model Card {
-  id          String     @id @default(cuid())
-  title       String
-  description String?    @db.Text
-  position    Int
-  priority    String     @default("medium")
-  dueDate     DateTime?
-  color       String?    @default("#3b82f6")
-  clientEmail String?
-  status      String     @default("active")
+  id                String     @id @default(cuid())
+  title             String
+  description       String?    @db.Text
+  position          Int
+  priority          String     @default("medium")
+  dueDate           DateTime?
+  color             String?    @default("#3b82f6")
+  clientEmail       String?
+  status            String     @default("active")
+  isRecurring       Boolean    @default(false)
+  recurrencePattern String?    @default("monthly")
   
-  boardId     String
-  board       Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  columnId    String
+  boardId           String
+  board             Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  columnId          String
   
-  values      CardValue[]
-  labels      Label[]
-  comments    Comment[]
-  cardTags    CardTag[]
-  files       File[]
+  values            CardValue[]
+  labels            Label[]
+  comments          Comment[]
+  cardTags          CardTag[]
+  files             File[]
   
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   @@index([boardId])
   @@index([columnId])
   @@index([status])
   @@index([clientEmail])
+  @@index([isRecurring])
 }
 
 model CardValue {
