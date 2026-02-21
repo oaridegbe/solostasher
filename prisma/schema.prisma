@@ -12,6 +12,7 @@ model Board {
   title     String
   userId    String
   cards     Card[]
+  tags      Tag[]    // Board-level tags for reuse
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -26,6 +27,8 @@ model Card {
   priority    String     @default("medium")
   dueDate     DateTime?
   color       String?    @default("#3b82f6")
+  clientEmail String?
+  status      String     @default("active")
   
   boardId     String
   board       Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -34,12 +37,47 @@ model Card {
   values      CardValue[]
   labels      Label[]
   comments    Comment[]
+  cardTags    CardTag[]  // Junction table for many-to-many tags
   
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
   @@index([boardId])
   @@index([columnId])
+  @@index([status])
+  @@index([clientEmail])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#3b82f6")
+  
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  
+  cardTags  CardTag[]
+  
+  createdAt DateTime @default(now())
+
+  @@unique([name, boardId]) // Tag names unique per board
+  @@index([boardId])
+}
+
+model CardTag {
+  id        String   @id @default(cuid())
+  
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  tagId     String
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@unique([cardId, tagId]) // Prevent duplicate tags on same card
+  @@index([cardId])
+  @@index([tagId])
 }
 
 model CardValue {
