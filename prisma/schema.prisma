@@ -25,7 +25,7 @@ model Card {
   position    Int
   priority    String     @default("medium")
   targetDate  DateTime?
-  color       String?    @default("#3b82f6") // Color picker field
+  color       String?    @default("#3b82f6")
   
   boardId     String
   board       Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -45,7 +45,7 @@ model Card {
 model CardValue {
   id            String         @id @default(cuid())
   name          String
-  category      String         // 'financial', 'performance', 'custom'
+  category      String
   currentValue  Float
   targetValue   Float
   unit          String         @default("")
@@ -78,7 +78,7 @@ model ValueHistory {
 
 model ValueAlert {
   id              String    @id @default(cuid())
-  condition       String    // 'above', 'below', 'equals'
+  condition       String
   threshold       Float
   message         String
   active          Boolean   @default(true)
@@ -102,4 +102,12 @@ model Label {
 
 model Comment {
   id        String   @id @default(cuid())
-  content  
+  content   String   @db.Text
+  authorId  String
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cardId])
+}
