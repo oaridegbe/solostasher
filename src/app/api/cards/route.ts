@@ -3,30 +3,11 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/cards?boardId=xxx - Get cards for a board
+// GET /api/cards - Get all cards (no board filter since no board table)
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const boardId = searchParams.get('boardId');
-
-    if (!boardId) {
-      return NextResponse.json({ error: 'boardId is required' }, { status: 400 });
-    }
-
     const cards = await prisma.card.findMany({
-      where: { boardId },
-      include: {
-        cardTags: {
-          include: {
-            tag: true
-          }
-        },
-        values: true,
-        _count: {
-          select: { comments: true, files: true }
-        }
-      },
-      orderBy: { position: 'asc' }
+      orderBy: { createdAt: 'desc' }
     });
 
     return NextResponse.json(cards);
@@ -42,43 +23,30 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { 
       title, 
-      description, 
-      boardId, 
-      columnId, 
-      position,
+      columnId,
       priority = 'medium',
       dueDate,
       color = '#3b82f6',
       clientEmail
     } = body;
 
-    if (!title || !boardId || !columnId) {
-      return NextResponse.json({ 
-        error: 'Title, boardId, and columnId are required' 
-      }, { status: 400 });
+    if (!title) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
-    const card = await prisma.card.create({
-      data: {
-        title,
-        description,
-        boardId,
-        columnId,
-        position,
-        priority,
-        dueDate: dueDate ? new Date(dueDate) : null,
-        color,
-        clientEmail
-      },
-      include: {
-        cardTags: {
-          include: {
-            tag: true
-          }
-        },
-        values: true
-      }
-    });
+    const createData: any = {
+      title: title,
+      status: columnId || 'inquiry',
+      color: color,
+      tags: '',
+      files: '[]',
+      isRecurring: false,
+      recurrencePattern: null,
+      client_email: clientEmail || null,
+      due_date: dueDate || null
+    };
+
+    const card = await prisma.card.create({ data: createData });
 
     return NextResponse.json(card, { status: 201 });
   } catch (error) {
@@ -87,7 +55,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/cards - Bulk update card positions (for drag & drop)
+// PATCH /api/cards - Update card status (move between columns)
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
@@ -99,18 +67,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Items must be an array' }, { status: 400 });
     }
 
-    // Update all cards in a transaction
-    await prisma.$transaction(
-      items.map(item => 
-        prisma.card.update({
-          where: { id: item.id },
-          data: { 
-            position: item.position,
-            columnId: item.columnId
-          }
-        })
-      )
-    );
+    // Update each card's status (column)
+    for (const item of items) {
+      await prisma.card.update({
+        where: { id: item.id },
+        data: { 
+          status: item.columnId
+        }
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
