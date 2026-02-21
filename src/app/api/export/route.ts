@@ -17,7 +17,7 @@ export async function GET() {
       `"${card.title.replace(/"/g, '""')}"`, // Escape quotes
       `"${card.client_email || ''}"`,
       card.status,
-      card.due_date || '',
+      card.dueDate || '',
       `"${card.tags || ''}"`,
       card.isRecurring ? 'Yes' : 'No',
       card.recurrencePattern || '',
