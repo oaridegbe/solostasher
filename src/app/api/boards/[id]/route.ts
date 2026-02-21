@@ -3,77 +3,63 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/boards/[id] - Get board with cards
+// GET /api/boards/[id] - Return all cards (virtual board)
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const board = await prisma.board.findUnique({
-      where: { id: params.id },
-      include: {
-        cards: {
-          include: {
-            cardTags: {
-              include: {
-                tag: true
-              }
-            },
-            values: true,
-            _count: {
-              select: { comments: true, files: true }
-            }
-          },
-          orderBy: { position: 'asc' }
-        },
-        tags: true
-      }
+    const cards = await prisma.card.findMany({
+      orderBy: { createdAt: 'desc' }
     });
 
-    if (!board) {
-      return NextResponse.json({ error: 'Board not found' }, { status: 404 });
-    }
-
-    return NextResponse.json(board);
+    // Return virtual board with cards
+    return NextResponse.json({
+      id: params.id,
+      title: 'My Deals',
+      cards: cards.map((card: any) => ({
+        id: card.id,
+        title: card.title,
+        description: null,
+        position: 0,
+        priority: 'medium',
+        dueDate: card.due_date,
+        color: card.color,
+        clientEmail: card.client_email,
+        columnId: card.status,
+        cardTags: [],
+        values: [],
+        _count: {
+          comments: 0,
+          files: 0
+        }
+      })),
+      tags: []
+    });
   } catch (error) {
     console.error('Error fetching board:', error);
     return NextResponse.json({ error: 'Failed to fetch board' }, { status: 500 });
   }
 }
 
-// PATCH /api/boards/[id] - Update board
+// PATCH /api/boards/[id] - Update board (no-op for virtual board)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  try {
-    const { title } = await request.json();
-
-    const board = await prisma.board.update({
-      where: { id: params.id },
-      data: { title }
-    });
-
-    return NextResponse.json(board);
-  } catch (error) {
-    console.error('Error updating board:', error);
-    return NextResponse.json({ error: 'Failed to update board' }, { status: 500 });
-  }
+  return NextResponse.json({ id: params.id, title: 'My Deals' });
 }
 
-// DELETE /api/boards/[id] - Delete board
+// DELETE /api/boards/[id] - Delete all cards (virtual board delete)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    await prisma.board.delete({
-      where: { id: params.id }
-    });
-
+    await prisma.card.deleteMany({});
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting board:', error);
-    return NextResponse.json({ error: 'Failed to delete board' }, { status: 500 });
+    console.error('Error deleting cards:', error);
+    return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
   }
 }
