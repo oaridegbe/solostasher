@@ -176,6 +176,7 @@ export default function BoardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <header className="bg-white border-b border-gray-200 px-8 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -185,6 +186,7 @@ export default function BoardPage() {
             <h1 className="text-2xl font-bold text-gray-900">{board.title}</h1>
           </div>
           
+          {/* Create Card Form */}
           <form onSubmit={createCard} className="flex items-center space-x-3">
             <select
               value={selectedColumn}
@@ -213,6 +215,7 @@ export default function BoardPage() {
         </div>
       </header>
 
+      {/* Kanban Board */}
       <div className="p-8 overflow-x-auto">
         <div className="flex space-x-6 min-w-max">
           {COLUMNS.map((column) => {
@@ -307,6 +310,7 @@ export default function BoardPage() {
                         )}
                       </div>
 
+                      {/* Quick Move Buttons */}
                       <div className="flex flex-wrap gap-1 mt-3 pt-2 border-t border-gray-100">
                         {COLUMNS.filter(col => col.id !== card.columnId).map(col => (
                           <button
