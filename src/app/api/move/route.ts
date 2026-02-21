@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,8 +17,8 @@ export async function POST(req: NextRequest) {
       
       // Calculate next due date
       let nextDueDate: Date | null = null;
-      if (updatedCard.due_date) {
-        const currentDue = new Date(updatedCard.due_date);
+      if (updatedCard.dueDate) {
+        const currentDue = new Date(updatedCard.dueDate);
         nextDueDate = new Date(currentDue);
         
         switch (pattern) {
@@ -45,35 +43,37 @@ export async function POST(req: NextRequest) {
       const newCard = await prisma.card.create({
         data: {
           title: updatedCard.title,
-          client_email: updatedCard.client_email,
+          clientEmail: updatedCard.clientEmail,
           color: updatedCard.color,
-          tags: updatedCard.tags,
-          files: updatedCard.files,
+          boardId: updatedCard.boardId,
+          columnId: updatedCard.columnId,
+          position: updatedCard.position,
           isRecurring: true,
           recurrencePattern: pattern,
-          due_date: nextDueDate ? nextDueDate.toISOString().split('T')[0] : null,
-          status: 'inquiry' // Reset to beginning
+          dueDate: nextDueDate,
+          status: 'inquiry',
+          priority: updatedCard.priority
         }
       });
 
-      // Log the activity
-      await prisma.activityLog.create({
-        data: {
-          cardId: newCard.id,
-          action: 'recurring_created',
-          details: `Auto-created from completed deal. Pattern: ${pattern}`
-        }
-      });
+      // Log the activity (commented out - add ActivityLog model if needed)
+      // await prisma.activityLog.create({
+      //   data: {
+      //     cardId: newCard.id,
+      //     action: 'recurring_created',
+      //     details: `Auto-created from completed deal. Pattern: ${pattern}`
+      //   }
+      // });
     }
 
-    // Log the move activity
-    await prisma.activityLog.create({
-      data: {
-        cardId: cardId,
-        action: 'status_changed',
-        details: `Moved to ${newStatus}`
-      }
-    });
+    // Log the move activity (commented out - add ActivityLog model if needed)
+    // await prisma.activityLog.create({
+    //   data: {
+    //     cardId: cardId,
+    //     action: 'status_changed',
+    //     details: `Moved to ${newStatus}`
+    //   }
+    // });
 
     return NextResponse.json({ success: true });
   } catch (error) {
