@@ -1,3 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Card {
+  id                String              @id @default(cuid())
+  title             String
+  clientEmail       String?             @map("client_email")
+  status            String              @default("inquiry")
+  color             String              @default("#3b82f6")
+  tags              String              @default("")
+  dueDate           String?             @map("due_date")
+  files             String              @default("[]")
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  isRecurring       Boolean             @default(false)
+  recurrencePattern String?
+  activityLog       ActivityLog[]
+  comments          Comment[]
+  notifications     NotificationQueue[]
+
+  @@map("Card")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  cardId    String
+  text      String
+  author    String   @default("User")
+  createdAt DateTime @default(now())
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@map("Comment")
+}
+
 model NotificationQueue {
   id        String    @id @default(cuid())
   cardId    String
@@ -11,4 +52,16 @@ model NotificationQueue {
   @@index([cardId])
   @@index([status, dueDate])
   @@map("NotificationQueue")
+}
+
+model ActivityLog {
+  id        String   @id
+  cardId    String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@map("ActivityLog")
 }
