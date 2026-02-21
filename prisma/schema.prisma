@@ -176,7 +176,8 @@ model NotificationQueue {
   card        Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
   type        String   // 'due_date', 'value_alert', etc.
   status      String   @default("pending") // 'pending', 'sent', 'failed'
-  scheduledAt DateTime
+  dueDate     DateTime? // Original due date for reference
+  scheduledAt DateTime  // When to send the notification
   sentAt      DateTime?
   error       String?
   
