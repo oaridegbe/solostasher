@@ -24,8 +24,7 @@ model Card {
   description String?    @db.Text
   position    Int
   priority    String     @default("medium")
-  targetDate  DateTime?
-  color       String?    @default("#3b82f6")
+  dueDate     DateTime?  // Due Date field
   
   boardId     String
   board       Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
