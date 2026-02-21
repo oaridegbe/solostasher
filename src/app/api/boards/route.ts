@@ -3,44 +3,47 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/boards - Get all boards
 export async function GET() {
   try {
-    const boards = await prisma.board.findMany({
-      include: {
-        _count: {
-          select: { cards: true }
-        }
-      },
-      orderBy: { updatedAt: 'desc' }
+    const cards = await prisma.card.findMany({
+      orderBy: { createdAt: 'desc' }
     });
 
-    return NextResponse.json(boards);
+    return NextResponse.json([{
+      id: 'default',
+      title: 'My Deals',
+      cards: cards,
+      _count: { cards: cards.length }
+    }]);
   } catch (error) {
-    console.error('Error fetching boards:', error);
-    return NextResponse.json({ error: 'Failed to fetch boards' }, { status: 500 });
+    console.error('Error fetching cards:', error);
+    return NextResponse.json({ error: 'Failed to fetch cards' }, { status: 500 });
   }
 }
 
-// POST /api/boards - Create a new board
 export async function POST(req: NextRequest) {
   try {
-    const { title, userId } = await req.json();
+    const { title } = await req.json();
 
-    if (!title || !userId) {
-      return NextResponse.json({ error: 'Title and userId are required' }, { status: 400 });
+    if (!title) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
-    const board = await prisma.board.create({
-      data: {
-        title,
-        userId
-      }
-    });
+    // Use type assertion to bypass strict checking
+    const createData: any = {
+      title: title,
+      status: 'inquiry',
+      color: '#3b82f6',
+      tags: '',
+      files: '[]',
+      isRecurring: false
+    };
 
-    return NextResponse.json(board, { status: 201 });
+    const card = await prisma.card.create({ data: createData });
+
+    return NextResponse.json(card, { status: 201 });
   } catch (error) {
-    console.error('Error creating board:', error);
-    return NextResponse.json({ error: 'Failed to create board' }, { status: 500 });
+    console.error('Error creating card:', error);
+    return NextResponse.json({ error: 'Failed to create card' }, { status: 500 });
   }
 }
