@@ -1,3 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Board {
+  id        String   @id @default(cuid())
+  title     String
+  userId    String
+  cards     Card[]
+  tags      Tag[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#3b82f6")
+  
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  
+  cardTags  CardTag[]
+  
+  createdAt DateTime @default(now())
+
+  @@unique([name, boardId])
+  @@index([boardId])
+}
+
+model CardTag {
+  id        String   @id @default(cuid())
+  
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  tagId     String
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@unique([cardId, tagId])
+  @@index([cardId])
+  @@index([tagId])
+}
+
 model Card {
   id          String     @id @default(cuid())
   title       String
@@ -17,7 +70,7 @@ model Card {
   labels      Label[]
   comments    Comment[]
   cardTags    CardTag[]
-  files       File[]     // Add this for file attachments
+  files       File[]
   
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -26,6 +79,76 @@ model Card {
   @@index([columnId])
   @@index([status])
   @@index([clientEmail])
+}
+
+model CardValue {
+  id            String         @id @default(cuid())
+  name          String
+  category      String
+  currentValue  Float
+  targetValue   Float
+  unit          String         @default("")
+  color         String         @default("#3b82f6")
+  
+  cardId        String
+  card          Card           @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  history       ValueHistory[]
+  alerts        ValueAlert[]
+  
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([cardId])
+}
+
+model ValueHistory {
+  id          String    @id @default(cuid())
+  value       Float
+  note        String?
+  timestamp   DateTime  @default(now())
+  
+  valueId     String
+  cardValue   CardValue @relation(fields: [valueId], references: [id], onDelete: Cascade)
+
+  @@index([valueId])
+  @@index([timestamp])
+}
+
+model ValueAlert {
+  id              String    @id @default(cuid())
+  condition       String
+  threshold       Float
+  message         String
+  active          Boolean   @default(true)
+  lastTriggered   DateTime?
+  
+  valueId         String
+  cardValue       CardValue @relation(fields: [valueId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+
+  @@index([valueId])
+}
+
+model Label {
+  id     String @id @default(cuid())
+  name   String
+  color  String
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  authorId  String
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cardId])
 }
 
 model File {
