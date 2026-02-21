@@ -1,5 +1,8 @@
 import { Resend } from 'resend';
 
+// Force dynamic rendering - prevents static generation error
+export const dynamic = 'force-dynamic';
+
 const getResend = () => {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error('RESEND_API_KEY not configured');
@@ -39,7 +42,7 @@ export async function GET(request: Request) {
     //     html: `
     //       <h2>Card Due Reminder</h2>
     //       <p>Your card <strong>${card.title}</strong> is due on ${card.targetDate}.</p>
-    //       <a href="https://solostasher.com/boards/${card.boardId}">View Board</a>
+    //       <a href="https://solostasher.com/boards/ ${card.boardId}">View Board</a>
     //     `
     //   });
     // }
