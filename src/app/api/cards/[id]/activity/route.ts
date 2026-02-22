@@ -18,9 +18,10 @@ async function auth(): Promise<{ userId: string | null }> {
 // GET /api/cards/[id]/activity - Get activity feed including value tracking changes
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id } = await params;
     const { userId } = await auth();
     
     if (!userId) {
@@ -44,7 +45,7 @@ export async function GET(
           unit: '$',
           change: '+7.3%'
         },
-        createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 mins ago
+        createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
         userId: 'user-1'
       },
       {
@@ -57,7 +58,7 @@ export async function GET(
           targetValue: 5.0,
           unit: '%'
         },
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
         userId: 'user-1'
       },
       {
@@ -93,14 +94,12 @@ export async function GET(
       }
     ];
 
-    // Filter activities by type if requested
     const typeFilter = searchParams.get('type');
     let filteredActivities = mockActivities;
     if (typeFilter) {
       filteredActivities = mockActivities.filter(a => a.type === typeFilter);
     }
 
-    // Filter for value-related activities only
     const valuesOnly = searchParams.get('valuesOnly') === 'true';
     if (valuesOnly) {
       filteredActivities = mockActivities.filter(a => 
@@ -128,12 +127,13 @@ export async function GET(
   }
 }
 
-// POST /api/cards/[id]/activity - Log new activity (including value changes)
+// POST /api/cards/[id]/activity - Log new activity
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id } = await params;
     const { userId } = await auth();
     
     if (!userId) {
@@ -143,7 +143,6 @@ export async function POST(
     const body = await request.json();
     const { type, description, metadata } = body;
 
-    // Validate required fields
     if (!type || !description) {
       return NextResponse.json(
         { error: 'Missing required fields: type and description' },
@@ -151,7 +150,6 @@ export async function POST(
       );
     }
 
-    // Create activity entry
     const newActivity: ActivityItem = {
       id: 'act-' + Date.now(),
       type,
@@ -160,9 +158,6 @@ export async function POST(
       createdAt: new Date().toISOString(),
       userId
     };
-
-    // In production, save to database here
-    // await prisma.activity.create({ data: newActivity });
 
     return NextResponse.json(newActivity, { status: 201 });
   } catch (error) {
