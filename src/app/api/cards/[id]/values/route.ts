@@ -5,13 +5,14 @@ export const dynamic = 'force-dynamic';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { value, currency } = await request.json();
 
     const card = await prisma.card.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { 
         value: value ? parseFloat(value) : 0,
         currency: currency || 'USD'
