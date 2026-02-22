@@ -1,15 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CardModal } from '@/components/CardModal';
 
 const columns = ["inquiry", "quoted", "completed", "followup"];
 const allTags = ["Hot", "Recurring", "Upsell"];
-const recurrenceOptions = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'yearly', label: 'Yearly' }
-];
 
 interface Card {
   id: string;
@@ -22,8 +17,6 @@ interface Card {
   files?: string;
   isRecurring?: boolean;
   recurrencePattern?: string;
-  activities?: any[];
-  comments?: any[];
 }
 
 interface FileAttachment {
@@ -41,15 +34,14 @@ export default function Dashboard() {
   const [cards, setCards] = useState<Card[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
-  const [newComment, setNewComment] = useState("");
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [view, setView] = useState<"board" | "calendar">("board");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [movingCardId, setMovingCardId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [isModalLoading, setIsModalLoading] = useState(false);
 
   // Toast helper
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -118,7 +110,6 @@ export default function Dashboard() {
     const { cardId } = JSON.parse(data);
     if (!cardId) return;
 
-    // Optimistic update
     const oldCards = [...cards];
     setCards((prev) =>
       prev.map((c) => (c.id === cardId ? { ...c, status: newStatus } : c))
@@ -135,7 +126,6 @@ export default function Dashboard() {
       if (!res.ok) throw new Error('Move failed');
       showToast(`Moved to ${newStatus}`);
     } catch (err) {
-      // Rollback on error
       setCards(oldCards);
       showToast('Failed to move deal', 'error');
       console.error("Move failed", err);
@@ -330,68 +320,14 @@ export default function Dashboard() {
   }
 
   // Modal functions
-  async function openCardModal(card: Card) {
-    setIsModalLoading(true);
-    setSelectedCard(card);
-    
-    try {
-      const [activityRes, commentsRes] = await Promise.all([
-        fetch(`/api/cards/${card.id}/activity`),
-        fetch(`/api/cards/${card.id}/comments`)
-      ]);
-      
-      let activities: any[] = [];
-      let comments: any[] = [];
-      
-      if (activityRes.ok) {
-        try {
-          const activityData = await activityRes.json();
-          activities = Array.isArray(activityData) ? activityData : [];
-        } catch (e) {
-          activities = [];
-        }
-      }
-      
-      if (commentsRes.ok) {
-        try {
-          const commentData = await commentsRes.json();
-          comments = Array.isArray(commentData) ? commentData : [];
-        } catch (e) {
-          comments = [];
-        }
-      }
-      
-      setSelectedCard({ ...card, activities, comments });
-    } catch (err) {
-      console.error("Failed to load card details:", err);
-      showToast('Failed to load card details', 'error');
-    } finally {
-      setIsModalLoading(false);
-    }
+  function openCardModal(cardId: string) {
+    setSelectedCardId(cardId);
+    setIsModalOpen(true);
   }
 
-  async function addComment(cardId: string) {
-    if (!newComment.trim()) return;
-    
-    try {
-      const res = await fetch(`/api/cards/${cardId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: newComment, author: "User" }),
-      });
-      
-      if (!res.ok) throw new Error('Failed to add comment');
-      
-      setNewComment("");
-      showToast('Comment added');
-      
-      if (selectedCard) {
-        openCardModal(selectedCard);
-      }
-    } catch (err) {
-      showToast('Failed to add comment', 'error');
-      console.error(err);
-    }
+  function closeCardModal() {
+    setIsModalOpen(false);
+    setSelectedCardId(null);
   }
 
   // Filter and Search
@@ -496,7 +432,7 @@ export default function Dashboard() {
                   {dayCards.map(card => (
                     <div
                       key={card.id}
-                      onClick={() => openCardModal(card)}
+                      onClick={() => openCardModal(card.id)}
                       className="text-xs p-1 rounded cursor-pointer truncate"
                       style={{ backgroundColor: card.color || "#3b82f6", color: "white" }}
                     >
@@ -507,183 +443,6 @@ export default function Dashboard() {
               </div>
             );
           })}
-        </div>
-      </div>
-    );
-  }
-
-  // Modal Component
-  function CardModal({ card }: { card: Card }) {
-    const activities = card.activities || [];
-    const comments = card.comments || [];
-    
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedCard(null)}>
-        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-          {/* Header */}
-          <div className="p-6 border-b flex justify-between items-start">
-            <div>
-              <h2 className="text-xl font-bold">{card.title}</h2>
-              <p className="text-gray-500">{card.client_email}</p>
-            </div>
-            <button onClick={() => setSelectedCard(null)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-          </div>
-          
-          {isModalLoading ? (
-            <div className="p-12 flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-            </div>
-          ) : (
-            <div className="p-6 space-y-6">
-              {/* Status & Due Date */}
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="text-sm font-medium text-gray-700">Status</label>
-                  <p className="capitalize font-medium">{card.status}</p>
-                </div>
-                <div className="flex-1">
-                  <label className="text-sm font-medium text-gray-700">Due Date</label>
-                  <input
-                    type="date"
-                    value={card.due_date ? card.due_date.substring(0, 10) : ""}
-                    onChange={(e) => {
-                      changeDueDate(card.id, e.target.value);
-                      setSelectedCard({ ...card, due_date: e.target.value });
-                    }}
-                    className="border rounded px-2 py-1 w-full"
-                  />
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className="text-sm font-medium text-gray-700 block mb-2">Tags</label>
-                <div className="flex gap-2 flex-wrap">
-                  {allTags.map(tag => {
-                    const isActive = (card.tags || "").split(",").includes(tag);
-                    return (
-                      <button
-                        key={tag}
-                        onClick={() => {
-                          const current = (card.tags || "").split(",").filter(Boolean);
-                          const next = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
-                          changeTags(card.id, next);
-                          setSelectedCard({ ...card, tags: next.join(",") });
-                        }}
-                        className={`px-3 py-1 rounded-full text-sm ${isActive ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-700"}`}
-                      >
-                        {tag}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Recurring Toggle */}
-              <div className="border-t pt-4">
-                <label className="text-sm font-medium text-gray-700 block mb-2">Recurrence</label>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={card.isRecurring || false}
-                      onChange={(e) => {
-                        const newValue = e.target.checked;
-                        toggleRecurring(card.id, newValue, card.recurrencePattern || 'monthly');
-                        setSelectedCard({ ...card, isRecurring: newValue, recurrencePattern: card.recurrencePattern || 'monthly' });
-                      }}
-                      className="w-4 h-4 text-indigo-600 rounded"
-                    />
-                    <span className="ml-2 text-sm">Auto-reset when completed</span>
-                  </label>
-                  
-                  {card.isRecurring && (
-                    <select
-                      value={card.recurrencePattern || 'monthly'}
-                      onChange={(e) => {
-                        const newPattern = e.target.value;
-                        toggleRecurring(card.id, true, newPattern);
-                        setSelectedCard({ ...card, recurrencePattern: newPattern });
-                      }}
-                      className="text-sm border rounded px-2 py-1"
-                    >
-                      {recurrenceOptions.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                {card.isRecurring && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    When moved to &quot;completed&quot;, a new deal will be created with the next due date.
-                  </p>
-                )}
-              </div>
-
-              {/* Files */}
-              {card.files && JSON.parse(card.files).length > 0 && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700 block mb-2">Attachments</label>
-                  <FileList card={card} />
-                </div>
-              )}
-
-              {/* Comments Section */}
-              <div className="border-t pt-4">
-                <h3 className="font-medium mb-3">Comments ({comments.length})</h3>
-                
-                {/* Add Comment */}
-                <div className="flex gap-2 mb-4">
-                  <input
-                    type="text"
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="Add a comment..."
-                    className="flex-1 border rounded px-3 py-2"
-                    onKeyPress={(e) => e.key === 'Enter' && addComment(card.id)}
-                  />
-                  <button
-                    onClick={() => addComment(card.id)}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                  >
-                    Post
-                  </button>
-                </div>
-
-                {/* Comments List */}
-                <div className="space-y-3">
-                  {comments.map((comment: any) => (
-                    <div key={comment.id} className="bg-gray-50 p-3 rounded">
-                      <div className="flex justify-between items-start">
-                        <span className="font-medium text-sm">{comment.author || "User"}</span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(comment.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <p className="text-gray-700 mt-1">{comment.text}</p>
-                    </div>
-                  ))}
-                  {comments.length === 0 && <p className="text-gray-400 italic">No comments yet</p>}
-                </div>
-              </div>
-
-              {/* Activity Log */}
-              <div className="border-t pt-4">
-                <h3 className="font-medium mb-3">Activity Log</h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {activities.map((activity: any) => (
-                    <div key={activity.id} className="text-sm text-gray-600 flex justify-between">
-                      <span>{activity.action}</span>
-                      <span className="text-gray-400 text-xs">
-                        {new Date(activity.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                  {activities.length === 0 && <p className="text-gray-400 italic">No activity recorded</p>}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -887,7 +646,7 @@ export default function Dashboard() {
                           key={c.id}
                           draggable
                           onDragStart={(e) => handleDragStart(e, c.id)}
-                          onClick={() => openCardModal(c)}
+                          onClick={() => openCardModal(c.id)}
                           className={`bg-white p-4 rounded-lg shadow-sm border border-gray-200 cursor-move hover:shadow-md transition-shadow relative group min-h-[140px] flex flex-col ${
                             movingCardId === c.id ? 'opacity-50' : ''
                           }`}
@@ -987,7 +746,11 @@ export default function Dashboard() {
       )}
 
       {/* Modal */}
-      {selectedCard && <CardModal card={selectedCard} />}
+      <CardModal 
+        cardId={selectedCardId || ''} 
+        isOpen={isModalOpen} 
+        onClose={closeCardModal} 
+      />
     </main>
   );
 }
