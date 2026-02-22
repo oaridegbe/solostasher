@@ -1,70 +1,166 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-interface InvoiceListProps {
+interface InvoiceGeneratorProps {
   cardId: string;
+  cardValue?: number;
+  clientEmail?: string;
+  clientName?: string;
 }
 
-export function InvoiceList({ cardId }: InvoiceListProps) {
-  const { data: invoices, isLoading } = useQuery({
-    queryKey: ['invoices', cardId],
-    queryFn: async () => {
-      const res = await fetch(`/api/cards/${cardId}/invoices`);
+export function InvoiceGenerator({ cardId, cardValue, clientEmail, clientName }: InvoiceGeneratorProps) {
+  const [amount, setAmount] = useState(cardValue?.toString() || '');
+  const [description, setDescription] = useState('');
+  const [customerEmail, setCustomerEmail] = useState(clientEmail || '');
+  const [customerName, setCustomerName] = useState(clientName || '');
+  const [dueDays, setDueDays] = useState(30);
+  const [notes, setNotes] = useState('');
+  const [showForm, setShowForm] = useState(false);
+
+  const queryClient = useQueryClient();
+
+  const createInvoice = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch(`/api/cards/${cardId}/invoices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
       return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices', cardId] });
+      setAmount('');
+      setDescription('');
+      setNotes('');
+      setShowForm(false);
     },
   });
 
-  if (isLoading) return <div>Loading invoices...</div>;
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'paid': return 'text-green-600 bg-green-100';
-      case 'open': return 'text-blue-600 bg-blue-100';
-      case 'void': return 'text-gray-600 bg-gray-100';
-      default: return 'text-yellow-600 bg-yellow-100';
-    }
+  const handleSubmit = (e: React.FormEvent, sendNow: boolean) => {
+    e.preventDefault();
+    createInvoice.mutate({
+      amount: parseFloat(amount),
+      description,
+      customerEmail,
+      customerName,
+      dueDays,
+      notes,
+      sendNow,
+    });
   };
 
+  if (!showForm) {
+    return (
+      <button
+        onClick={() => setShowForm(true)}
+        className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+      >
+        + Create New Invoice
+      </button>
+    );
+  }
+
   return (
-    <div className="space-y-2">
-      <h3 className="text-lg font-semibold">Invoices</h3>
+    <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+      <h3 className="font-semibold">Create Invoice</h3>
       
-      {invoices?.length === 0 ? (
-        <p className="text-gray-500">No invoices yet</p>
-      ) : (
-        <div className="space-y-2">
-          {invoices?.map((invoice: any) => (
-            <div key={invoice.id} className="p-3 bg-gray-50 rounded border">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-medium">
-                    {invoice.currency} {invoice.amount}
-                  </p>
-                  <p className="text-sm text-gray-600">{invoice.description}</p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(invoice.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <span className={`px-2 py-1 text-xs rounded ${getStatusColor(invoice.status)}`}>
-                  {invoice.status}
-                </span>
-              </div>
-              
-              {invoice.hostedUrl && (
-                <a
-                  href={invoice.hostedUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-500 hover:underline mt-2 inline-block"
-                >
-                  View Invoice →
-                </a>
-              )}
-            </div>
-          ))}
+      <form className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium">Amount</label>
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-full p-2 border rounded"
+            placeholder="0.00"
+            required
+          />
         </div>
-      )}
+
+        <div>
+          <label className="block text-sm font-medium">Customer Email</label>
+          <input
+            type="email"
+            value={customerEmail}
+            onChange={(e) => setCustomerEmail(e.target.value)}
+            className="w-full p-2 border rounded"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Customer Name</label>
+          <input
+            type="text"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            className="w-full p-2 border rounded"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full p-2 border rounded"
+            rows={2}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Due Days</label>
+          <input
+            type="number"
+            value={dueDays}
+            onChange={(e) => setDueDays(parseInt(e.target.value))}
+            className="w-full p-2 border rounded"
+            min={1}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Notes</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="w-full p-2 border rounded"
+            rows={2}
+            placeholder="Payment instructions, bank details, etc."
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={(e) => handleSubmit(e, false)}
+            disabled={createInvoice.isPending}
+            className="flex-1 p-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+          >
+            {createInvoice.isPending ? 'Creating...' : 'Save as Draft'}
+          </button>
+          
+          <button
+            type="button"
+            onClick={(e) => handleSubmit(e, true)}
+            disabled={createInvoice.isPending}
+            className="flex-1 p-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+          >
+            {createInvoice.isPending ? 'Sending...' : 'Send Invoice'}
+          </button>
+        </div>
+        
+        <button
+          type="button"
+          onClick={() => setShowForm(false)}
+          className="w-full p-2 text-gray-600 hover:text-gray-800"
+        >
+          Cancel
+        </button>
+      </form>
     </div>
   );
 }
