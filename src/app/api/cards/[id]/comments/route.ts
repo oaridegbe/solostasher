@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Type definitions
 interface Comment {
   id: string;
   content: string;
@@ -14,17 +13,16 @@ interface Comment {
   attachments: string[];
 }
 
-// Mock auth function
 async function auth(): Promise<{ userId: string | null }> {
   return { userId: 'mock-user-id' };
 }
 
-// GET /api/cards/[id]/comments - Get all comments for a card
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id } = await params;
     const { userId } = await auth();
     
     if (!userId) {
@@ -35,12 +33,11 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    // Mock comments data
     const mockComments: Comment[] = [
       {
         id: 'comment-1',
         content: 'Great progress on the revenue target! We\'re at 96% of goal.',
-        cardId: params.id,
+        cardId: id,
         authorId: 'user-1',
         authorName: 'John Doe',
         authorAvatar: 'JD',
@@ -52,7 +49,7 @@ export async function GET(
       {
         id: 'comment-2',
         content: 'The conversion rate is still below target. @sarah can you look into this?',
-        cardId: params.id,
+        cardId: id,
         authorId: 'user-2',
         authorName: 'Jane Smith',
         authorAvatar: 'JS',
@@ -64,7 +61,7 @@ export async function GET(
       {
         id: 'comment-3',
         content: 'Updated the Monthly Revenue value to reflect Q3 numbers. Current: $48,294',
-        cardId: params.id,
+        cardId: id,
         authorId: 'user-1',
         authorName: 'John Doe',
         authorAvatar: 'JD',
@@ -95,12 +92,12 @@ export async function GET(
   }
 }
 
-// POST /api/cards/[id]/comments - Add a new comment
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id } = await params;
     const { userId } = await auth();
     
     if (!userId) {
@@ -120,25 +117,15 @@ export async function POST(
     const newComment: Comment = {
       id: 'comment-' + Date.now(),
       content: content.trim(),
-      cardId: params.id,
+      cardId: id,
       authorId: userId,
-      authorName: 'John Doe', // In production, fetch from user profile
+      authorName: 'John Doe',
       authorAvatar: 'JD',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       mentions,
       attachments
     };
-
-    // In production, save to database and trigger notifications for mentions
-    // await prisma.comment.create({ data: newComment });
-
-    // If comment mentions value changes, parse and log activity
-    const valueChangePattern = /(increased|decreased|changed|updated).+?(to|by)\s*[\d$%,.]+/i;
-    if (valueChangePattern.test(content)) {
-      // Log value-related activity
-      console.log('Value change mentioned in comment:', content);
-    }
 
     return NextResponse.json(newComment, { status: 201 });
   } catch (error) {
@@ -150,12 +137,12 @@ export async function POST(
   }
 }
 
-// PATCH /api/cards/[id]/comments/[commentId] - Update a comment
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id } = await params;
     const { userId } = await auth();
     
     if (!userId) {
@@ -175,7 +162,6 @@ export async function PATCH(
       );
     }
 
-    // In production, verify comment ownership and update
     const updatedComment: Partial<Comment> = {
       content: content.trim(),
       updatedAt: new Date().toISOString()
@@ -191,12 +177,12 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/cards/[id]/comments/[commentId] - Delete a comment
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id } = await params;
     const { userId } = await auth();
     
     if (!userId) {
@@ -205,9 +191,6 @@ export async function DELETE(
 
     const url = new URL(request.url);
     const commentId = url.pathname.split('/').pop();
-
-    // In production, verify ownership and delete
-    // await prisma.comment.delete({ where: { id: commentId } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
