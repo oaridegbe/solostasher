@@ -22,15 +22,6 @@ export function CardModal({ cardId, isOpen, onClose }: CardModalProps) {
     enabled: isOpen,
   });
 
-  const { data: quotes } = useQuery({
-    queryKey: ['quotes', cardId],
-    queryFn: async () => {
-      const res = await fetch(`/api/cards/${cardId}/quotes`);
-      return res.json();
-    },
-    enabled: isOpen && activeTab === 'quotes',
-  });
-
   const { data: invoices } = useQuery({
     queryKey: ['invoices', cardId],
     queryFn: async () => {
@@ -77,20 +68,8 @@ export function CardModal({ cardId, isOpen, onClose }: CardModalProps) {
           )}
 
           {activeTab === 'quotes' && (
-            <div className="space-y-4">
-              <h3 className="font-semibold">Quotes</h3>
-              {quotes?.length === 0 ? (
-                <p>No quotes yet</p>
-              ) : (
-                quotes?.map((quote: any) => (
-                  <div key={quote.id} className="p-3 bg-gray-50 rounded">
-                    <p className="font-medium">{quote.currency} {quote.amount}</p>
-                    <p className="text-sm text-gray-600">{quote.description}</p>
-                    <p className="text-xs text-gray-500">Status: {quote.status}</p>
-                  </div>
-                ))
-              )}
-              {/* Add Quote Form Here */}
+            <div>
+              <p>Quotes coming soon...</p>
             </div>
           )}
 
@@ -100,33 +79,40 @@ export function CardModal({ cardId, isOpen, onClose }: CardModalProps) {
                 cardId={cardId}
                 cardValue={card?.value}
                 clientEmail={card?.clientEmail}
+                clientName={card?.title}
               />
               
-              <h3 className="font-semibold mt-6">Existing Invoices</h3>
-              {invoices?.length === 0 ? (
-                <p>No invoices yet</p>
-              ) : (
-                invoices?.map((invoice: any) => (
-                  <div key={invoice.id} className="p-3 bg-gray-50 rounded">
-                    <div className="flex justify-between">
-                      <p className="font-medium">{invoice.currency} {invoice.amount}</p>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
-                        invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {invoice.status}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600">{invoice.description}</p>
-                    {invoice.hostedUrl && (
-                      <a href={invoice.hostedUrl} target="_blank" className="text-sm text-blue-500">
-                        View Invoice →
-                      </a>
-                    )}
+              <div className="mt-6">
+                <h3 className="font-semibold mb-3">Existing Invoices</h3>
+                {invoices?.length === 0 ? (
+                  <p className="text-gray-500">No invoices yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {invoices?.map((invoice: any) => (
+                      <div key={invoice.id} className="p-3 bg-gray-50 rounded border">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">
+                              {invoice.currency} {invoice.amount}
+                            </p>
+                            <p className="text-sm text-gray-600">{invoice.description}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(invoice.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <span className={`px-2 py-1 text-xs rounded ${
+                            invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
+                            invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {invoice.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))
-              )}
+                )}
+              </div>
             </div>
           )}
 

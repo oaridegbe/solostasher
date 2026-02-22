@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { CardModal } from '@/components/CardModal';
 
 interface Tag {
   id: string;
@@ -63,6 +64,10 @@ export default function BoardPage() {
   const [newCardTitle, setNewCardTitle] = useState('');
   const [selectedColumn, setSelectedColumn] = useState('inquiry');
   const [isCreating, setIsCreating] = useState(false);
+  
+  // Add modal state
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchBoard();
@@ -116,6 +121,7 @@ export default function BoardPage() {
   };
 
   const moveCard = async (cardId: string, newColumnId: string) => {
+    // Don't move if clicking the card to open modal
     if (!board) return;
 
     const columnCards = board.cards.filter(c => c.columnId === newColumnId);
@@ -142,6 +148,18 @@ export default function BoardPage() {
     } catch (error) {
       console.error('Error moving card:', error);
     }
+  };
+
+  // Add function to open modal
+  const openCardModal = (cardId: string) => {
+    setSelectedCardId(cardId);
+    setIsModalOpen(true);
+  };
+
+  const closeCardModal = () => {
+    setIsModalOpen(false);
+    setSelectedCardId(null);
+    fetchBoard(); // Refresh board data when modal closes
   };
 
   const getPriorityColor = (priority: string) => {
@@ -238,7 +256,8 @@ export default function BoardPage() {
                   {columnCards.map((card) => (
                     <div
                       key={card.id}
-                      className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+                      onClick={() => openCardModal(card.id)}
+                      className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
                     >
                       <div className="flex items-start justify-between mb-2">
                         <h4 className="font-medium text-gray-900">{card.title}</h4>
@@ -311,7 +330,7 @@ export default function BoardPage() {
                       </div>
 
                       {/* Quick Move Buttons */}
-                      <div className="flex flex-wrap gap-1 mt-3 pt-2 border-t border-gray-100">
+                      <div className="flex flex-wrap gap-1 mt-3 pt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
                         {COLUMNS.filter(col => col.id !== card.columnId).map(col => (
                           <button
                             key={col.id}
@@ -330,6 +349,15 @@ export default function BoardPage() {
           })}
         </div>
       </div>
+
+      {/* Card Modal */}
+      {selectedCardId && (
+        <CardModal
+          cardId={selectedCardId}
+          isOpen={isModalOpen}
+          onClose={closeCardModal}
+        />
+      )}
     </div>
   );
 }
