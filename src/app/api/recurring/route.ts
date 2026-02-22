@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { cardId, newStatus } = await request.json();
+    const { cardId, newStatus } = await req.json();
     
     // Update the card status
     const updatedCard = await prisma.card.update({
