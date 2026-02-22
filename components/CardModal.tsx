@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { InvoiceGenerator } from './InvoiceGenerator';
+import { InvoiceGenerator } from '@/components/InvoiceGenerator';
 
 interface CardModalProps {
   cardId: string;
