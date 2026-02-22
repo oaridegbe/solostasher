@@ -10,26 +10,24 @@ export async function GET() {
     });
 
     // CSV Header
-    const headers = ['Title', 'Client Email', 'Status', 'Due Date', 'Tags', 'Priority', 'Created At', 'Color'];
+    const headers = ['Title', 'Client Email', 'Status', 'Due Date', 'Tags', 'Created At'];
     
     // CSV Rows
     const rows = cards.map((card: any) => [
       `"${card.title.replace(/"/g, '""')}"`,
-      `"${card.clientEmail || ''}"`,
+      `"${card.client_email || ''}"`,
       card.status,
-      card.dueDate || '',
+      card.due_date || '',
       `"${card.tags || ''}"`,
-      'medium',
-      new Date(card.createdAt).toLocaleDateString(),
-      card.color || '#3b82f6'
+      new Date(card.createdAt).toLocaleDateString()
     ]);
 
-    const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const csv = [headers.join(','), ...rows.map((row: any) => row.join(','))].join('\n');
 
     return new NextResponse(csv, {
       headers: {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="solostasher-deals-${new Date().toISOString().split('T')[0]}.csv"`
+        'Content-Disposition': `attachment; filename="solostasher-export-${new Date().toISOString().split('T')[0]}.csv"`
       }
     });
   } catch (error) {
