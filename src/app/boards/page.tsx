@@ -236,22 +236,41 @@ export default function Dashboard() {
     location.reload();
   }
 
-  // Modal functions
+  // Modal functions - FIXED with error handling
   async function openCardModal(card: Card) {
+    let activities: any[] = [];
+    let comments: any[] = [];
+    
     try {
       const [activityRes, commentsRes] = await Promise.all([
         fetch(`/api/cards/${card.id}/activity`),
         fetch(`/api/cards/${card.id}/comments`)
       ]);
       
-      const activities = await activityRes.json();
-      const comments = await commentsRes.json();
+      // Safely parse activities
+      if (activityRes.ok) {
+        try {
+          const activityData = await activityRes.json();
+          activities = Array.isArray(activityData) ? activityData : [];
+        } catch (e) {
+          activities = [];
+        }
+      }
       
-      setSelectedCard({ ...card, activities, comments });
+      // Safely parse comments
+      if (commentsRes.ok) {
+        try {
+          const commentData = await commentsRes.json();
+          comments = Array.isArray(commentData) ? commentData : [];
+        } catch (e) {
+          comments = [];
+        }
+      }
     } catch (err) {
       console.error("Failed to load card details:", err);
-      setSelectedCard(card);
     }
+    
+    setSelectedCard({ ...card, activities, comments });
   }
 
   async function addComment(cardId: string) {
@@ -388,7 +407,7 @@ export default function Dashboard() {
     );
   }
 
-  // Modal Component
+  // Modal Component - FIXED with safe array handling
   function CardModal({ card }: { card: Card }) {
     const activities = card.activities || [];
     const comments = card.comments || [];
