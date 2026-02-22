@@ -31,6 +31,12 @@ interface FileAttachment {
   name: string;
 }
 
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error';
+}
+
 export default function Dashboard() {
   const [cards, setCards] = useState<Card[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -39,23 +45,43 @@ export default function Dashboard() {
   const [newComment, setNewComment] = useState("");
   const [view, setView] = useState<"board" | "calendar">("board");
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [movingCardId, setMovingCardId] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [isModalLoading, setIsModalLoading] = useState(false);
+
+  // Toast helper
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3000);
+  };
 
   useEffect(() => {
-    fetch("/api/cards")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setCards(data);
-        } else {
-          console.error("API didn't return array:", data);
-          setCards([]);
-        }
-      })
-      .catch((err) => {
-        console.error("Fetch error:", err);
-        setCards([]);
-      });
+    fetchCards();
   }, []);
+
+  async function fetchCards() {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/cards");
+      if (!res.ok) throw new Error('Failed to fetch cards');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setCards(data);
+      } else {
+        throw new Error('Invalid data format');
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
+      showToast('Failed to load deals', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   // Calendar helpers
   function getDaysInMonth(date: Date) {
@@ -79,7 +105,7 @@ export default function Dashboard() {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   }
 
-  // Drag & Drop
+  // Drag & Drop with optimistic update
   function handleDragStart(e: React.DragEvent<HTMLDivElement>, cardId: string) {
     e.dataTransfer.setData("text/plain", JSON.stringify({ cardId }));
   }
@@ -92,18 +118,29 @@ export default function Dashboard() {
     const { cardId } = JSON.parse(data);
     if (!cardId) return;
 
+    // Optimistic update
+    const oldCards = [...cards];
     setCards((prev) =>
       prev.map((c) => (c.id === cardId ? { ...c, status: newStatus } : c))
     );
+    setMovingCardId(cardId);
 
     try {
-      await fetch("/api/move", {
+      const res = await fetch("/api/move", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cardId, newStatus }),
       });
+      
+      if (!res.ok) throw new Error('Move failed');
+      showToast(`Moved to ${newStatus}`);
     } catch (err) {
+      // Rollback on error
+      setCards(oldCards);
+      showToast('Failed to move deal', 'error');
       console.error("Move failed", err);
+    } finally {
+      setMovingCardId(null);
     }
   }
 
@@ -111,57 +148,89 @@ export default function Dashboard() {
     e.preventDefault();
   }
 
-  // Change color
+  // Change color with optimistic update
   async function changeColor(cardId: string, newColor: string) {
+    const oldCards = [...cards];
     setCards((prev) =>
       prev.map((c) => (c.id === cardId ? { ...c, color: newColor } : c))
     );
 
-    fetch("/api/color", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, color: newColor }),
-    }).catch((err) => console.error("Color update failed", err));
+    try {
+      const res = await fetch("/api/color", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId, color: newColor }),
+      });
+      if (!res.ok) throw new Error('Failed to update color');
+    } catch (err) {
+      setCards(oldCards);
+      showToast('Failed to update color', 'error');
+      console.error("Color update failed", err);
+    }
   }
 
-  // Change tags
+  // Change tags with optimistic update
   async function changeTags(cardId: string, newTags: string[]) {
     const tagsStr = newTags.join(",");
+    const oldCards = [...cards];
     setCards((prev) =>
       prev.map((c) => (c.id === cardId ? { ...c, tags: tagsStr } : c))
     );
 
-    fetch("/api/tags", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, tags: tagsStr }),
-    }).catch((err) => console.error("Tags update failed", err));
+    try {
+      const res = await fetch("/api/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId, tags: tagsStr }),
+      });
+      if (!res.ok) throw new Error('Failed to update tags');
+    } catch (err) {
+      setCards(oldCards);
+      showToast('Failed to update tags', 'error');
+      console.error("Tags update failed", err);
+    }
   }
 
-  // Change due date
+  // Change due date with optimistic update
   async function changeDueDate(cardId: string, newDate: string) {
+    const oldCards = [...cards];
     setCards((prev) =>
       prev.map((c) => (c.id === cardId ? { ...c, due_date: newDate } : c))
     );
 
-    fetch("/api/due", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, due_date: newDate }),
-    }).catch((err) => console.error("Due-date update failed", err));
+    try {
+      const res = await fetch("/api/due", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId, due_date: newDate }),
+      });
+      if (!res.ok) throw new Error('Failed to update due date');
+    } catch (err) {
+      setCards(oldCards);
+      showToast('Failed to update due date', 'error');
+      console.error("Due-date update failed", err);
+    }
   }
 
-  // Toggle recurring
+  // Toggle recurring with optimistic update
   async function toggleRecurring(cardId: string, isRecurring: boolean, pattern: string = 'monthly') {
+    const oldCards = [...cards];
     setCards(prev =>
       prev.map(c => c.id === cardId ? { ...c, isRecurring, recurrencePattern: pattern } : c)
     );
 
-    await fetch('/api/recurring', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cardId, isRecurring, pattern })
-    }).catch(err => console.error('Failed to update recurring:', err));
+    try {
+      const res = await fetch('/api/recurring', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId, isRecurring, pattern })
+      });
+      if (!res.ok) throw new Error('Failed to update recurring');
+    } catch (err) {
+      setCards(oldCards);
+      showToast('Failed to update recurrence', 'error');
+      console.error('Failed to update recurring:', err);
+    }
   }
 
   // File uploads
@@ -171,7 +240,7 @@ export default function Dashboard() {
     
     try {
       const res = await fetch("/api/upload", { method: "POST", body: form });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('Upload failed');
       const urls: FileAttachment[] = await res.json();
       const card = cards.find((c) => c.id === cardId);
       const current: FileAttachment[] = JSON.parse(card?.files || "[]");
@@ -181,12 +250,14 @@ export default function Dashboard() {
         prev.map((c) => (c.id === cardId ? { ...c, files: JSON.stringify(next) } : c))
       );
       
-      fetch("/api/files", {
+      await fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cardId, files: JSON.stringify(next) }),
-      }).catch((err) => console.error("Files update failed", err));
+      });
+      showToast('Files uploaded');
     } catch (err) {
+      showToast('Failed to upload files', 'error');
       console.error("Upload error:", err);
     }
   }
@@ -200,11 +271,17 @@ export default function Dashboard() {
       prev.map((c) => (c.id === cardId ? { ...c, files: JSON.stringify(next) } : c))
     );
     
-    fetch("/api/files", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, files: JSON.stringify(next) }),
-    }).catch((err) => console.error("Files update failed", err));
+    try {
+      await fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId, files: JSON.stringify(next) }),
+      });
+      showToast('File removed');
+    } catch (err) {
+      showToast('Failed to remove file', 'error');
+      console.error("Files update failed", err);
+    }
   }
 
   // New deal
@@ -217,29 +294,45 @@ export default function Dashboard() {
     const email = emailInput?.value;
     const color = colorInput?.value;
     
-    if (!title) return;
+    if (!title) {
+      showToast('Please enter a title', 'error');
+      return;
+    }
 
-    await fetch("/api/cards", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        title, 
-        email, 
-        color, 
-        tags: "", 
-        due_date: "", 
-        files: "[]",
-        status: "inquiry"
-      }),
-    });
-    
-    location.reload();
+    setIsCreating(true);
+    try {
+      const res = await fetch("/api/cards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          title, 
+          email, 
+          color, 
+          tags: "", 
+          due_date: "", 
+          files: "[]",
+          status: "inquiry"
+        }),
+      });
+      
+      if (!res.ok) throw new Error('Failed to create deal');
+      
+      showToast('Deal created successfully');
+      titleInput.value = '';
+      if (emailInput) emailInput.value = '';
+      await fetchCards();
+    } catch (err) {
+      showToast('Failed to create deal', 'error');
+      console.error(err);
+    } finally {
+      setIsCreating(false);
+    }
   }
 
-  // Modal functions - FIXED with error handling
+  // Modal functions
   async function openCardModal(card: Card) {
-    let activities: any[] = [];
-    let comments: any[] = [];
+    setIsModalLoading(true);
+    setSelectedCard(card);
     
     try {
       const [activityRes, commentsRes] = await Promise.all([
@@ -247,7 +340,9 @@ export default function Dashboard() {
         fetch(`/api/cards/${card.id}/comments`)
       ]);
       
-      // Safely parse activities
+      let activities: any[] = [];
+      let comments: any[] = [];
+      
       if (activityRes.ok) {
         try {
           const activityData = await activityRes.json();
@@ -257,7 +352,6 @@ export default function Dashboard() {
         }
       }
       
-      // Safely parse comments
       if (commentsRes.ok) {
         try {
           const commentData = await commentsRes.json();
@@ -266,26 +360,37 @@ export default function Dashboard() {
           comments = [];
         }
       }
+      
+      setSelectedCard({ ...card, activities, comments });
     } catch (err) {
       console.error("Failed to load card details:", err);
+      showToast('Failed to load card details', 'error');
+    } finally {
+      setIsModalLoading(false);
     }
-    
-    setSelectedCard({ ...card, activities, comments });
   }
 
   async function addComment(cardId: string) {
     if (!newComment.trim()) return;
     
-    await fetch(`/api/cards/${cardId}/comments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: newComment, author: "User" }),
-    });
-    
-    setNewComment("");
-    
-    if (selectedCard) {
-      openCardModal(selectedCard);
+    try {
+      const res = await fetch(`/api/cards/${cardId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: newComment, author: "User" }),
+      });
+      
+      if (!res.ok) throw new Error('Failed to add comment');
+      
+      setNewComment("");
+      showToast('Comment added');
+      
+      if (selectedCard) {
+        openCardModal(selectedCard);
+      }
+    } catch (err) {
+      showToast('Failed to add comment', 'error');
+      console.error(err);
     }
   }
 
@@ -407,7 +512,7 @@ export default function Dashboard() {
     );
   }
 
-  // Modal Component - FIXED with safe array handling
+  // Modal Component
   function CardModal({ card }: { card: Card }) {
     const activities = card.activities || [];
     const comments = card.comments || [];
@@ -424,162 +529,210 @@ export default function Dashboard() {
             <button onClick={() => setSelectedCard(null)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
           </div>
           
-          <div className="p-6 space-y-6">
-            {/* Status & Due Date */}
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <label className="text-sm font-medium text-gray-700">Status</label>
-                <p className="capitalize font-medium">{card.status}</p>
-              </div>
-              <div className="flex-1">
-                <label className="text-sm font-medium text-gray-700">Due Date</label>
-                <input
-                  type="date"
-                  value={card.due_date ? card.due_date.substring(0, 10) : ""}
-                  onChange={(e) => {
-                    changeDueDate(card.id, e.target.value);
-                    setSelectedCard({ ...card, due_date: e.target.value });
-                  }}
-                  className="border rounded px-2 py-1 w-full"
-                />
-              </div>
+          {isModalLoading ? (
+            <div className="p-12 flex justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
             </div>
-
-            {/* Tags */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">Tags</label>
-              <div className="flex gap-2 flex-wrap">
-                {allTags.map(tag => {
-                  const isActive = (card.tags || "").split(",").includes(tag);
-                  return (
-                    <button
-                      key={tag}
-                      onClick={() => {
-                        const current = (card.tags || "").split(",").filter(Boolean);
-                        const next = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
-                        changeTags(card.id, next);
-                        setSelectedCard({ ...card, tags: next.join(",") });
-                      }}
-                      className={`px-3 py-1 rounded-full text-sm ${isActive ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-700"}`}
-                    >
-                      {tag}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Recurring Toggle */}
-            <div className="border-t pt-4">
-              <label className="text-sm font-medium text-gray-700 block mb-2">Recurrence</label>
-              <div className="flex items-center gap-3 flex-wrap">
-                <label className="flex items-center cursor-pointer">
+          ) : (
+            <div className="p-6 space-y-6">
+              {/* Status & Due Date */}
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-gray-700">Status</label>
+                  <p className="capitalize font-medium">{card.status}</p>
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-gray-700">Due Date</label>
                   <input
-                    type="checkbox"
-                    checked={card.isRecurring || false}
+                    type="date"
+                    value={card.due_date ? card.due_date.substring(0, 10) : ""}
                     onChange={(e) => {
-                      const newValue = e.target.checked;
-                      toggleRecurring(card.id, newValue, card.recurrencePattern || 'monthly');
-                      setSelectedCard({ ...card, isRecurring: newValue, recurrencePattern: card.recurrencePattern || 'monthly' });
+                      changeDueDate(card.id, e.target.value);
+                      setSelectedCard({ ...card, due_date: e.target.value });
                     }}
-                    className="w-4 h-4 text-indigo-600 rounded"
+                    className="border rounded px-2 py-1 w-full"
                   />
-                  <span className="ml-2 text-sm">Auto-reset when completed</span>
-                </label>
-                
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">Tags</label>
+                <div className="flex gap-2 flex-wrap">
+                  {allTags.map(tag => {
+                    const isActive = (card.tags || "").split(",").includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        onClick={() => {
+                          const current = (card.tags || "").split(",").filter(Boolean);
+                          const next = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
+                          changeTags(card.id, next);
+                          setSelectedCard({ ...card, tags: next.join(",") });
+                        }}
+                        className={`px-3 py-1 rounded-full text-sm ${isActive ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-700"}`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Recurring Toggle */}
+              <div className="border-t pt-4">
+                <label className="text-sm font-medium text-gray-700 block mb-2">Recurrence</label>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={card.isRecurring || false}
+                      onChange={(e) => {
+                        const newValue = e.target.checked;
+                        toggleRecurring(card.id, newValue, card.recurrencePattern || 'monthly');
+                        setSelectedCard({ ...card, isRecurring: newValue, recurrencePattern: card.recurrencePattern || 'monthly' });
+                      }}
+                      className="w-4 h-4 text-indigo-600 rounded"
+                    />
+                    <span className="ml-2 text-sm">Auto-reset when completed</span>
+                  </label>
+                  
+                  {card.isRecurring && (
+                    <select
+                      value={card.recurrencePattern || 'monthly'}
+                      onChange={(e) => {
+                        const newPattern = e.target.value;
+                        toggleRecurring(card.id, true, newPattern);
+                        setSelectedCard({ ...card, recurrencePattern: newPattern });
+                      }}
+                      className="text-sm border rounded px-2 py-1"
+                    >
+                      {recurrenceOptions.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
                 {card.isRecurring && (
-                  <select
-                    value={card.recurrencePattern || 'monthly'}
-                    onChange={(e) => {
-                      const newPattern = e.target.value;
-                      toggleRecurring(card.id, true, newPattern);
-                      setSelectedCard({ ...card, recurrencePattern: newPattern });
-                    }}
-                    className="text-sm border rounded px-2 py-1"
-                  >
-                    {recurrenceOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    When moved to &quot;completed&quot;, a new deal will be created with the next due date.
+                  </p>
                 )}
               </div>
-              {card.isRecurring && (
-                <p className="text-xs text-gray-500 mt-2">
-                  When moved to &quot;completed&quot;, a new deal will be created with the next due date.
-                </p>
+
+              {/* Files */}
+              {card.files && JSON.parse(card.files).length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-2">Attachments</label>
+                  <FileList card={card} />
+                </div>
               )}
-            </div>
 
-            {/* Files */}
-            {card.files && JSON.parse(card.files).length > 0 && (
-              <div>
-                <label className="text-sm font-medium text-gray-700 block mb-2">Attachments</label>
-                <FileList card={card} />
+              {/* Comments Section */}
+              <div className="border-t pt-4">
+                <h3 className="font-medium mb-3">Comments ({comments.length})</h3>
+                
+                {/* Add Comment */}
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Add a comment..."
+                    className="flex-1 border rounded px-3 py-2"
+                    onKeyPress={(e) => e.key === 'Enter' && addComment(card.id)}
+                  />
+                  <button
+                    onClick={() => addComment(card.id)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                  >
+                    Post
+                  </button>
+                </div>
+
+                {/* Comments List */}
+                <div className="space-y-3">
+                  {comments.map((comment: any) => (
+                    <div key={comment.id} className="bg-gray-50 p-3 rounded">
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium text-sm">{comment.author || "User"}</span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(comment.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-gray-700 mt-1">{comment.text}</p>
+                    </div>
+                  ))}
+                  {comments.length === 0 && <p className="text-gray-400 italic">No comments yet</p>}
+                </div>
               </div>
-            )}
 
-            {/* Comments Section */}
-            <div className="border-t pt-4">
-              <h3 className="font-medium mb-3">Comments ({comments.length})</h3>
-              
-              {/* Add Comment */}
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Add a comment..."
-                  className="flex-1 border rounded px-3 py-2"
-                  onKeyPress={(e) => e.key === 'Enter' && addComment(card.id)}
-                />
-                <button
-                  onClick={() => addComment(card.id)}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                >
-                  Post
-                </button>
-              </div>
-
-              {/* Comments List */}
-              <div className="space-y-3">
-                {comments.map((comment: any) => (
-                  <div key={comment.id} className="bg-gray-50 p-3 rounded">
-                    <div className="flex justify-between items-start">
-                      <span className="font-medium text-sm">{comment.author || "User"}</span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(comment.createdAt).toLocaleDateString()}
+              {/* Activity Log */}
+              <div className="border-t pt-4">
+                <h3 className="font-medium mb-3">Activity Log</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {activities.map((activity: any) => (
+                    <div key={activity.id} className="text-sm text-gray-600 flex justify-between">
+                      <span>{activity.action}</span>
+                      <span className="text-gray-400 text-xs">
+                        {new Date(activity.createdAt).toLocaleString()}
                       </span>
                     </div>
-                    <p className="text-gray-700 mt-1">{comment.text}</p>
-                  </div>
-                ))}
-                {comments.length === 0 && <p className="text-gray-400 italic">No comments yet</p>}
+                  ))}
+                  {activities.length === 0 && <p className="text-gray-400 italic">No activity recorded</p>}
+                </div>
               </div>
             </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
-            {/* Activity Log */}
-            <div className="border-t pt-4">
-              <h3 className="font-medium mb-3">Activity Log</h3>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {activities.map((activity: any) => (
-                  <div key={activity.id} className="text-sm text-gray-600 flex justify-between">
-                    <span>{activity.action}</span>
-                    <span className="text-gray-400 text-xs">
-                      {new Date(activity.createdAt).toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-                {activities.length === 0 && <p className="text-gray-400 italic">No activity recorded</p>}
-              </div>
+  // Toast Component
+  function ToastContainer() {
+    return (
+      <div className="fixed bottom-4 right-4 z-50 space-y-2">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`px-4 py-3 rounded-lg shadow-lg text-white font-medium animate-slide-up ${
+              toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Loading Skeleton
+  function LoadingSkeleton() {
+    return (
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        {columns.map((col) => (
+          <div key={col} className="w-80 bg-gray-100 p-3 rounded-lg flex-shrink-0">
+            <div className="h-6 bg-gray-200 rounded mb-3 w-24 animate-pulse"></div>
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-white p-4 rounded-lg h-32 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded mb-2 w-3/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        ))}
       </div>
     );
   }
 
   return (
     <main className="p-6 max-w-7xl mx-auto">
+      {/* Toast Notifications */}
+      <ToastContainer />
+      
       {/* Header with View Toggle and Export */}
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">SoloStasher Board</h1>
@@ -655,8 +808,19 @@ export default function Dashboard() {
           <label className="text-sm text-gray-600">Color:</label>
           <input id="color" type="color" className="w-10 h-10 border rounded cursor-pointer" defaultValue="#3b82f6" />
         </div>
-        <button onClick={createDeal} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">
-          + New Deal
+        <button 
+          onClick={createDeal} 
+          disabled={isCreating}
+          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {isCreating ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Creating...
+            </>
+          ) : (
+            '+ New Deal'
+          )}
         </button>
       </div>
 
@@ -693,125 +857,134 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Board View */}
-      {view === "board" && (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {columns.map((col) => (
-            <div
-              key={col}
-              className="w-80 bg-gray-100 p-3 rounded-lg flex-shrink-0 min-h-[500px]"
-              onDrop={(e) => handleDrop(e, col)}
-              onDragOver={handleDragOver}
-            >
-              <h2 className="font-bold capitalize mb-3 text-gray-700 px-1">
-                {col} 
-                <span className="ml-2 text-xs font-normal text-gray-500">
-                  ({visibleCards.filter((c) => c.status === col).length})
-                </span>
-              </h2>
-              
-              <div className="space-y-3">
-                {visibleCards
-                  .filter((c) => c.status === col)
-                  .map((c) => (
-                    <div
-                      key={c.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, c.id)}
-                      onClick={() => openCardModal(c)}
-                      className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 cursor-move hover:shadow-md transition-shadow relative group min-h-[140px] flex flex-col"
-                      style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
-                    >
-                      {/* Header: Due Date Badge and Date Picker */}
-                      <div className="flex items-center justify-between mb-3">
-                        <DueBadge date={c.due_date} />
-                        <input
-                          type="date"
-                          value={c.due_date ? c.due_date.substring(0, 10) : ""}
-                          onChange={(e) => changeDueDate(c.id, e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-xs border rounded px-1 py-0.5 text-gray-600 cursor-pointer hover:border-gray-400"
-                          title="Set due date"
-                        />
-                      </div>
-
-                      {/* Content */}
-                      <div className="mb-3 flex-grow">
-                        <p className="font-semibold text-gray-800 leading-tight">{c.title}</p>
-                        {c.client_email && (
-                          <p className="text-sm text-gray-500 mt-1">{c.client_email}</p>
-                        )}
-                        {c.isRecurring && (
-                          <span className="text-xs text-indigo-600 font-medium mt-1 inline-block">
-                            ↻ Recurring
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Bottom row: Tags (aligned bottom), file + color */}
-                      <div className="flex items-end justify-between mt-auto gap-2">
-                        <div className="flex gap-1 flex-wrap content-end">
-                          {allTags.map((tag) => {
-                            const active = (c.tags || "").split(",").includes(tag);
-                            return (
-                              <button
-                                key={tag}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const current = (c.tags || "").split(",").filter(Boolean);
-                                  const next = current.includes(tag)
-                                    ? current.filter((t) => t !== tag)
-                                    : [...current, tag];
-                                  changeTags(c.id, next);
-                                }}
-                                className={`text-[10px] px-2 py-1 rounded border transition-colors ${
-                                  active
-                                    ? "bg-indigo-600 text-white border-indigo-600"
-                                    : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                                }`}
-                              >
-                                {tag}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <label 
-                            className="text-xs px-2 py-1 rounded border bg-gray-100 text-gray-700 cursor-pointer hover:bg-gray-200 transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            File
+      {/* Loading State */}
+      {isLoading ? (
+        <LoadingSkeleton />
+      ) : (
+        <>
+          {/* Board View */}
+          {view === "board" && (
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {columns.map((col) => (
+                <div
+                  key={col}
+                  className="w-80 bg-gray-100 p-3 rounded-lg flex-shrink-0 min-h-[500px]"
+                  onDrop={(e) => handleDrop(e, col)}
+                  onDragOver={handleDragOver}
+                >
+                  <h2 className="font-bold capitalize mb-3 text-gray-700 px-1">
+                    {col} 
+                    <span className="ml-2 text-xs font-normal text-gray-500">
+                      ({visibleCards.filter((c) => c.status === col).length})
+                    </span>
+                  </h2>
+                  
+                  <div className="space-y-3">
+                    {visibleCards
+                      .filter((c) => c.status === col)
+                      .map((c) => (
+                        <div
+                          key={c.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, c.id)}
+                          onClick={() => openCardModal(c)}
+                          className={`bg-white p-4 rounded-lg shadow-sm border border-gray-200 cursor-move hover:shadow-md transition-shadow relative group min-h-[140px] flex flex-col ${
+                            movingCardId === c.id ? 'opacity-50' : ''
+                          }`}
+                          style={{ borderLeft: `5px solid ${c.color || "#3b82f6"}` }}
+                        >
+                          {/* Header: Due Date Badge and Date Picker */}
+                          <div className="flex items-center justify-between mb-3">
+                            <DueBadge date={c.due_date} />
                             <input
-                              type="file"
-                              multiple
-                              onChange={(e) => e.target.files && uploadFiles(c.id, e.target.files)}
-                              className="hidden"
+                              type="date"
+                              value={c.due_date ? c.due_date.substring(0, 10) : ""}
+                              onChange={(e) => changeDueDate(c.id, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs border rounded px-1 py-0.5 text-gray-600 cursor-pointer hover:border-gray-400"
+                              title="Set due date"
                             />
-                          </label>
-                          <input
-                            type="color"
-                            value={c.color || "#3b82f6"}
-                            onChange={(e) => changeColor(c.id, e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-8 h-8 p-0 border-0 rounded cursor-pointer overflow-hidden"
-                            title="Change color"
-                          />
+                          </div>
+
+                          {/* Content */}
+                          <div className="mb-3 flex-grow">
+                            <p className="font-semibold text-gray-800 leading-tight">{c.title}</p>
+                            {c.client_email && (
+                              <p className="text-sm text-gray-500 mt-1">{c.client_email}</p>
+                            )}
+                            {c.isRecurring && (
+                              <span className="text-xs text-indigo-600 font-medium mt-1 inline-block">
+                                ↻ Recurring
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Bottom row: Tags (aligned bottom), file + color */}
+                          <div className="flex items-end justify-between mt-auto gap-2">
+                            <div className="flex gap-1 flex-wrap content-end">
+                              {allTags.map((tag) => {
+                                const active = (c.tags || "").split(",").includes(tag);
+                                return (
+                                  <button
+                                    key={tag}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const current = (c.tags || "").split(",").filter(Boolean);
+                                      const next = current.includes(tag)
+                                        ? current.filter((t) => t !== tag)
+                                        : [...current, tag];
+                                      changeTags(c.id, next);
+                                    }}
+                                    className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                                      active
+                                        ? "bg-indigo-600 text-white border-indigo-600"
+                                        : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                                    }`}
+                                  >
+                                    {tag}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <label 
+                                className="text-xs px-2 py-1 rounded border bg-gray-100 text-gray-700 cursor-pointer hover:bg-gray-200 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                File
+                                <input
+                                  type="file"
+                                  multiple
+                                  onChange={(e) => e.target.files && uploadFiles(c.id, e.target.files)}
+                                  className="hidden"
+                                />
+                              </label>
+                              <input
+                                type="color"
+                                value={c.color || "#3b82f6"}
+                                onChange={(e) => changeColor(c.id, e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-8 h-8 p-0 border-0 rounded cursor-pointer overflow-hidden"
+                                title="Change color"
+                              />
+                            </div>
+                          </div>
+
+                          {/* File Attachments */}
+                          <FileList card={c} />
                         </div>
-                      </div>
-
-                      {/* File Attachments */}
-                      <FileList card={c} />
-                    </div>
-                  ))}
-              </div>
+                      ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      {/* Calendar View */}
-      {view === "calendar" && <CalendarView />}
+          {/* Calendar View */}
+          {view === "calendar" && <CalendarView />}
+        </>
+      )}
 
       {/* Modal */}
       {selectedCard && <CardModal card={selectedCard} />}
