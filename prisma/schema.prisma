@@ -7,61 +7,212 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// NextAuth models first
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  accounts      Account[]
+  sessions      Session[]
+  boards        Board[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Board before Card
+model Board {
+  id        String   @id @default(cuid())
+  title     String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Card before models that reference it
 model Card {
   id                String              @id @default(cuid())
   title             String
   clientEmail       String?             @map("client_email")
   status            String              @default("inquiry")
   color             String              @default("#3b82f6")
-  tags              String              @default("")
+  tags              String              @default("[]")
   dueDate           String?             @map("due_date")
   files             String              @default("[]")
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  isRecurring       Boolean             @default(false)
-  recurrencePattern String?
-  activityLog       ActivityLog[]
-  comments          Comment[]
-  notifications     NotificationQueue[]
+  createdAt         DateTime            @default(now()) @map("createdAt")
+  updatedAt         DateTime            @updatedAt @map("updatedAt")
+  isRecurring       Boolean             @default(false) @map("isRecurring")
+  recurrencePattern String?             @map("recurrencePattern")
+  currency          String?             @default("USD")
+  value             Float?              @default(0)
+  ActivityLog       ActivityLog[]
+  Comment           Comment[]
+  NotificationQueue NotificationQueue[]
+  quotes            Quote[]
+  invoices          Invoice[]
+}
 
-  @@map("Card")
+// Quote before Invoice
+model Quote {
+  id            String    @id @default(cuid())
+  cardId        String
+  card          Card      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  amount        Float
+  currency      String    @default("USD")
+  description   String?
+  lineItems     String    @default("[]")
+  status        String    @default("draft")
+  validUntil    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  invoice       Invoice?
+
+  @@index([cardId])
+}
+
+// Invoice last
+model Invoice {
+  id            String    @id @default(cuid())
+  cardId        String
+  card          Card      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  quoteId       String?   @unique
+  quote         Quote?    @relation(fields: [quoteId], references: [id])
+  amount        Float
+  currency      String    @default("USD")
+  description   String?
+  status        String    @default("draft")
+  paidAt        DateTime?
+  sentAt        DateTime?
+  dueDate       DateTime?
+  pdfUrl        String?
+  lineItems     String    @default("[]")
+  customerEmail String?
+  customerName  String?
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([cardId])
+}
+
+// Other models
+model ActivityLog {
+  id        String   @id @default(cuid())
+  cardId    String   @map("cardId")
+  action    String
+  details   String?
+  createdAt DateTime @default(now()) @map("createdAt")
+  Card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
 }
 
 model Comment {
-  id        String   @id @default(cuid())
-  cardId    String
+  id        String   @id
+  cardId    String   @map("cardId")
   text      String
   author    String   @default("User")
-  createdAt DateTime @default(now())
-  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("createdAt")
+  Card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId])
-  @@map("Comment")
 }
 
 model NotificationQueue {
-  id        String    @id @default(cuid())
-  cardId    String
+  id        String    @id
+  cardId    String    @map("cardId")
   type      String
   status    String    @default("pending")
-  dueDate   DateTime
-  createdAt DateTime  @default(now())
-  sentAt    DateTime?
-  card      Card      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  dueDate   DateTime  @map("dueDate")
+  createdAt DateTime  @default(now()) @map("createdAt")
+  sentAt    DateTime? @map("sentAt")
+  Card      Card      @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId])
   @@index([status, dueDate])
-  @@map("NotificationQueue")
 }
 
-model ActivityLog {
-  id        String   @id
-  cardId    String
-  action    String
-  details   String?
-  createdAt DateTime @default(now())
-  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+model CardValue {
+  id            String         @id @default(cuid())
+  cardId        String
+  name          String
+  category      String
+  currentValue  Float
+  targetValue   Float          @default(0)
+  unit          String         @default("")
+  color         String         @default("#3b82f6")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  history       ValueHistory[]
+  alerts        ValueAlert[]
 
   @@index([cardId])
-  @@map("ActivityLog")
+}
+
+model ValueHistory {
+  id          String    @id @default(cuid())
+  valueId     String
+  value       Float
+  note        String?   @db.Text
+  timestamp   DateTime  @default(now())
+  cardValue   CardValue @relation(fields: [valueId], references: [id], onDelete: Cascade)
+
+  @@index([valueId])
+  @@index([timestamp])
+}
+
+model ValueAlert {
+  id            String     @id @default(cuid())
+  valueId       String
+  condition     String
+  threshold     Float
+  message       String
+  active        Boolean    @default(true)
+  lastTriggered DateTime?
+  cardValue     CardValue  @relation(fields: [valueId], references: [id], onDelete: Cascade)
+
+  @@index([valueId])
 }

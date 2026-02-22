@@ -3,13 +3,11 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/cards - Get all cards (no board filter since no board table)
 export async function GET(request: NextRequest) {
   try {
     const cards = await prisma.card.findMany({
       orderBy: { createdAt: 'desc' }
     });
-
     return NextResponse.json(cards);
   } catch (error) {
     console.error('Error fetching cards:', error);
@@ -17,17 +15,19 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/cards - Create a new card
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { 
       title, 
-      columnId,
-      priority = 'medium',
-      dueDate,
-      color = '#3b82f6',
-      clientEmail
+      email, 
+      color, 
+      tags, 
+      due_date, 
+      files,
+      status,
+      value,
+      currency
     } = body;
 
     if (!title) {
@@ -35,19 +35,19 @@ export async function POST(request: NextRequest) {
     }
 
     const createData: any = {
-      title: title,
-      status: columnId || 'inquiry',
-      color: color,
-      tags: '',
-      files: '[]',
-      isRecurring: false,
-      recurrencePattern: null,
-      client_email: clientEmail || null,
-      due_date: dueDate || null
+      title,
+      clientEmail: email || null,
+      color: color || '#3b82f6',
+      tags: tags || '',
+      dueDate: due_date || null,
+      files: files || '[]',
+      status: status || 'inquiry',
+      value: value ? parseFloat(value) : 0,
+      currency: currency || 'USD',
+      isRecurring: false
     };
 
     const card = await prisma.card.create({ data: createData });
-
     return NextResponse.json(card, { status: 201 });
   } catch (error) {
     console.error('Error creating card:', error);
@@ -55,7 +55,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/cards - Update card status (move between columns)
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
@@ -67,13 +66,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Items must be an array' }, { status: 400 });
     }
 
-    // Update each card's status (column)
     for (const item of items) {
       await prisma.card.update({
         where: { id: item.id },
-        data: { 
-          status: item.columnId
-        }
+        data: { status: item.columnId }
       });
     }
 
