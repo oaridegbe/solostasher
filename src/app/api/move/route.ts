@@ -7,17 +7,20 @@ export async function POST(req: NextRequest) {
   try {
     const { cardId, newStatus } = await req.json();
     
-    // Get the current card
+    console.log('Moving card:', cardId, 'to status:', newStatus); // DEBUG
+    
     const updatedCard = await prisma.card.update({
       where: { id: cardId },
       data: { status: newStatus }
     });
 
-    // If moving to completed and card is recurring, create next occurrence
+    console.log('Card updated:', updatedCard.id, 'isRecurring:', updatedCard.isRecurring); // DEBUG
+
     if (newStatus === 'completed' && updatedCard.isRecurring) {
+      console.log('Creating recurring card...'); // DEBUG
+      
       const pattern = updatedCard.recurrencePattern || 'monthly';
       
-      // Calculate next due date
       let nextDueDate: string | null = null;
       if (updatedCard.dueDate) {
         const currentDue = new Date(updatedCard.dueDate);
@@ -36,30 +39,26 @@ export async function POST(req: NextRequest) {
           case 'yearly':
             nextDate.setFullYear(nextDate.getFullYear() + 1);
             break;
-          default:
-            nextDate.setMonth(nextDate.getMonth() + 1);
         }
         
         nextDueDate = nextDate.toISOString();
       }
 
-      // Create new recurring deal
-      const createData: any = {
-        title: updatedCard.title,
-        clientEmail: updatedCard.clientEmail,
-        color: updatedCard.color,
-        status: 'inquiry',
-        priority: 'medium',
-        isRecurring: true,
-        recurrencePattern: pattern,
-        dueDate: nextDueDate,
-        tags: '',
-        files: '[]'
-      };
-
-      await prisma.card.create({
-        data: createData
+      const newCard = await prisma.card.create({
+        data: {
+          title: updatedCard.title,
+          clientEmail: updatedCard.clientEmail,
+          color: updatedCard.color,
+          status: 'inquiry',
+          isRecurring: true,
+          recurrencePattern: pattern,
+          dueDate: nextDueDate,
+          tags: '',
+          files: '[]'
+        }
       });
+
+      console.log('New recurring card created:', newCard.id); // DEBUG
     }
 
     return NextResponse.json({ success: true });
