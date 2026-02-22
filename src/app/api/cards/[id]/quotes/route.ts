@@ -7,16 +7,17 @@ export const dynamic = 'force-dynamic';
 // GET /api/cards/[id]/quotes
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const user = await getCurrentUser();
     if (!user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const quotes = await prisma.quote.findMany({
-      where: { cardId: params.id },
+      where: { cardId: id },
       include: { invoice: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -31,9 +32,10 @@ export async function GET(
 // POST /api/cards/[id]/quotes
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const user = await getCurrentUser();
     if (!user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -48,7 +50,7 @@ export async function POST(
 
     const quote = await prisma.quote.create({
       data: {
-        cardId: params.id,
+        cardId: id,
         amount,
         currency,
         description,
