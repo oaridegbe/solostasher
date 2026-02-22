@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Type definitions
 interface ValueHistory {
   id: string;
   valueId: string;
@@ -22,17 +21,17 @@ interface CardValue {
   updatedAt: string;
 }
 
-// Mock auth function
 async function auth(): Promise<{ userId: string | null }> {
   return { userId: 'mock-user-id' };
 }
 
-// GET /api/cards/[id]/values/[valueId]/history - Get value history
+// GET /api/cards/[id]/values/[valueId]/history
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; valueId: string } }
+  { params }: { params: Promise<{ id: string; valueId: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id, valueId } = await params;
     const { userId } = await auth();
     
     if (!userId) {
@@ -42,10 +41,9 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    // Mock history data
     const mockHistory: ValueHistory[] = Array.from({ length: limit }, (_, i) => ({
       id: `hist-${i}`,
-      valueId: params.valueId,
+      valueId: valueId,
       value: 40000 + Math.random() * 10000,
       note: i % 5 === 0 ? 'Weekly update' : undefined,
       timestamp: new Date(Date.now() - (limit - i) * 24 * 60 * 60 * 1000).toISOString()
@@ -61,12 +59,13 @@ export async function GET(
   }
 }
 
-// PATCH /api/cards/[id]/values/[valueId] - Update value and add history
+// PATCH /api/cards/[id]/values/[valueId]
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; valueId: string } }
+  { params }: { params: Promise<{ id: string; valueId: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id, valueId } = await params;
     const { userId } = await auth();
     
     if (!userId) {
@@ -76,10 +75,9 @@ export async function PATCH(
     const body = await request.json();
     const { newValue, note, targetValue, name, unit, color } = body;
 
-    // Mock current value
     const currentValue: CardValue = {
-      id: params.valueId,
-      cardId: params.id,
+      id: valueId,
+      cardId: id,
       name: name || 'Monthly Revenue',
       category: 'financial',
       currentValue: newValue || 48294,
@@ -90,18 +88,16 @@ export async function PATCH(
       updatedAt: new Date().toISOString()
     };
 
-    // If value changed, create history entry
     let historyEntry: ValueHistory | undefined;
     if (newValue !== undefined) {
       historyEntry = {
         id: 'hist-' + Date.now(),
-        valueId: params.valueId,
+        valueId: valueId,
         value: newValue,
         note: note || 'Updated',
         timestamp: new Date().toISOString()
       };
 
-      // Check alerts
       if (currentValue.targetValue && newValue >= currentValue.targetValue) {
         console.log('Target reached!');
       }
@@ -120,20 +116,18 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/cards/[id]/values/[valueId] - Delete a value
+// DELETE /api/cards/[id]/values/[valueId]
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; valueId: string } }
+  { params }: { params: Promise<{ id: string; valueId: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id, valueId } = await params;
     const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    // In production, verify ownership and delete
-    // await prisma.cardValue.delete({ where: { id: params.valueId } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
