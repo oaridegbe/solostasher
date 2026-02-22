@@ -6,16 +6,17 @@ export const dynamic = 'force-dynamic';
 // GET /api/boards/[id] - Return all cards (virtual board)
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const cards = await prisma.card.findMany({
       orderBy: { createdAt: 'desc' }
     });
 
     // Return virtual board with cards
     return NextResponse.json({
-      id: params.id,
+      id: id,
       title: 'My Deals',
       cards: cards.map((card: any) => ({
         id: card.id,
@@ -45,15 +46,16 @@ export async function GET(
 // PATCH /api/boards/[id] - Update board (no-op for virtual board)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  return NextResponse.json({ id: params.id, title: 'My Deals' });
+  const { id } = await params;
+  return NextResponse.json({ id: id, title: 'My Deals' });
 }
 
 // DELETE /api/boards/[id] - Delete all cards (virtual board delete)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await prisma.card.deleteMany({});
