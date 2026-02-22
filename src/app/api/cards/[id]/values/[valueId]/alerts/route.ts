@@ -10,17 +10,17 @@ interface ValueAlert {
   createdAt: string;
 }
 
-// Mock auth function
 async function auth(): Promise<{ userId: string | null }> {
   return { userId: 'mock-user-id' };
 }
 
-// GET /api/cards/[id]/values/[valueId]/alerts - Get alerts for a value
+// GET /api/cards/[id]/values/[valueId]/alerts
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; valueId: string } }
+  { params }: { params: Promise<{ id: string; valueId: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id, valueId } = await params;
     const { userId } = await auth();
     
     if (!userId) {
@@ -30,7 +30,7 @@ export async function GET(
     const mockAlerts: ValueAlert[] = [
       {
         id: 'alert-1',
-        valueId: params.valueId,
+        valueId: valueId,
         condition: 'above',
         threshold: 45000,
         message: 'Revenue exceeded target!',
@@ -49,12 +49,13 @@ export async function GET(
   }
 }
 
-// POST /api/cards/[id]/values/[valueId]/alerts - Create alert
+// POST /api/cards/[id]/values/[valueId]/alerts
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; valueId: string } }
+  { params }: { params: Promise<{ id: string; valueId: string }> }
 ): Promise<NextResponse> {
   try {
+    const { id, valueId } = await params;
     const { userId } = await auth();
     
     if (!userId) {
@@ -73,7 +74,7 @@ export async function POST(
 
     const newAlert: ValueAlert = {
       id: 'alert-' + Date.now(),
-      valueId: params.valueId,
+      valueId: valueId,
       condition,
       threshold,
       message,
