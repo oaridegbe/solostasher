@@ -327,7 +327,7 @@ export default function Dashboard() {
 
   function closeCardModal() {
     setIsModalOpen(false);
-    setSelectedCardId(null);
+    setTimeout(() => setSelectedCardId(null), 300);
   }
 
   // Filter and Search
@@ -745,12 +745,14 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* Modal */}
-      <CardModal 
-        cardId={selectedCardId || ''} 
-        isOpen={isModalOpen} 
-        onClose={closeCardModal} 
-      />
+      {/* Modal - Only render when we have a valid cardId and modal is open */}
+      {selectedCardId && isModalOpen && (
+        <CardModal 
+          cardId={selectedCardId} 
+          isOpen={isModalOpen} 
+          onClose={closeCardModal} 
+        />
+      )}
     </main>
   );
 }
