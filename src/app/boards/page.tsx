@@ -321,6 +321,7 @@ export default function Dashboard() {
 
   // Modal functions
   function openCardModal(cardId: string) {
+    console.log('Opening modal for card:', cardId);
     setSelectedCardId(cardId);
     setIsModalOpen(true);
   }
@@ -743,6 +744,13 @@ export default function Dashboard() {
           {/* Calendar View */}
           {view === "calendar" && <CalendarView />}
         </>
+      )}
+
+      {/* Debug - remove after testing */}
+      {selectedCardId && (
+        <div style={{position:'fixed', top:0, left:0, background:'red', color:'white', zIndex:9999, padding:'10px'}}>
+          Card ID: {selectedCardId} | isOpen: {isModalOpen ? 'true' : 'false'}
+        </div>
       )}
 
       {/* Modal - Only render when we have a valid cardId and modal is open */}
